@@ -1,0 +1,35 @@
+{
+  "name": "@darkling/service-bus",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./lit": "./src/lit/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "lit": "^3.0.0",
+    "@lit/context": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "lit": {
+      "optional": true
+    },
+    "@lit/context": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@lit/context": "^1.1.6",
+    "@repo/eslint-config": "workspace:*",
+    "lit": "^3.3.3"
+  }
+}
