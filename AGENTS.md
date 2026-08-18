@@ -107,3 +107,5 @@ Do not invent behaviour that is not established by an applicable specification.
 Do not make unrelated improvements while implementing a requested change.
 
 Generated artefacts must not be edited directly. Modify their source and regenerate them using the repository's prescribed tooling.
+
+When initiating a new package, establish a specification and journal in the package's root to capture implementation decisions.
