@@ -77,6 +77,37 @@ Each service declares its interface and metadata separately from its implementat
 - The service implementation is not part of the declaration. The broker uses the declaration to route calls and validate messages; the host loads and executes the implementation.
 - A service may expose multiple functions, each with its own parameter and return schemas.
 
+### Declaration module and implementation loading
+
+A service's declaration and implementation are separate modules. The declaration module is the service's entry point; the implementation module is loaded lazily by the declaration's `implementationLoader`. This separation is what allows the broker and callers to use the declaration (for routing, validation, and typed proxies) without loading the implementation, and what allows the host worker to load the implementation on demand when activating a service.
+
+- The declaration module must export the `ServiceDeclaration` as a named `declaration` export. This is the convention by which the host worker obtains the declaration: it dynamically imports the declaration module and reads the `declaration` export.
+- The `implementationLoader` must return a promise that resolves to the implementation's constructor — a class extending `ServiceImplementation`. The host instantiates the constructor with a `HostContext`, injecting bus access at construction time.
+- The `implementationLoader` must load the implementation module via dynamic `import()`, so that the implementation is not loaded until a host needs to activate the service. This keeps the implementation out of the initial bundle and allows it to be loaded on demand.
+- The declaration module must not import the implementation module at module-load time. The declaration may import only the types and schemas needed to declare the service's interface; importing the implementation would defeat the lazy-loading purpose of the `implementationLoader`.
+
+```gherkin
+Feature: Declaration module and implementation loading
+  Rule: The declaration and implementation are separate modules; the loader imports the implementation on demand
+
+  Scenario: Host worker loads a declaration
+    Given a service "retrieval" with declaration module "@darkling/knowledge-base/service"
+    When the host worker dynamically imports the declaration module
+    Then the module must export a named "declaration" export
+    And the export must be a ServiceDeclaration
+
+  Scenario: Implementation loaded lazily
+    Given a service declaration with an implementationLoader
+    When the host calls implementationLoader()
+    Then the loader must return a promise for the implementation's constructor
+    And the implementation module must not have been loaded before the call
+
+  Scenario: Declaration module does not import the implementation
+    Given a service's declaration module
+    When the declaration module is imported
+    Then the implementation module must not be loaded as a dependency
+```
+
 ### Service registry
 
 The broker maintains a service registry of service declarations.

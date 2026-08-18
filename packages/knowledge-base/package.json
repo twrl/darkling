@@ -1,0 +1,37 @@
+{
+  "name": "@darkling/knowledge-base",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./compiler": "./src/compiler/index.ts",
+    "./service": "./src/service-declaration.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "dependencies": {
+    "remark": "^15.0.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@darkling/service-bus": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@darkling/service-bus": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@darkling/service-bus": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
+    "@types/mdast": "^4.0.4"
+  }
+}

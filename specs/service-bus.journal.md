@@ -2,6 +2,30 @@
 
 This journal records the development of [service-bus.spec.md](./service-bus.spec.md). It is non-normative; the specification takes precedence.
 
+## Declaration module and implementation loading (spec clarification)
+
+Established via the specification workflow, prompted by the first service package (`@darkling/knowledge-base`) initially placing its service declaration and implementation in a single module with an `implementationLoader` that returned `Promise.resolve(Implementation)` — eagerly pulling the implementation into any consumer of the declaration. The user identified this as defeating the lazy-loading purpose of the `implementationLoader` and requested the split, with the declaration as its own entry point and the loader wrapping a dynamic `import()`.
+
+### Context
+
+The root spec already established that the declaration and implementation are separate ("The service implementation is not part of the declaration... the host loads and executes the implementation"), and the `ServiceDeclaration` type includes an `implementationLoader`. The `@darkling/service-bus` package's [package.spec.md](../packages/service-bus/package.spec.md) documents the host worker's convention of dynamically `import()`ing a declaration module and calling `implementationLoader()`. However, neither normatively established the module/entry-point convention on the _service package_ side: that the declaration and implementation are separate modules, that the declaration module exports a named `declaration` export, that the `implementationLoader` wraps a dynamic `import()`, or that the declaration module must not import the implementation at module-load time.
+
+### Decisions
+
+Through dialogue with the user, the following were established as normative requirements in a new "Declaration module and implementation loading" subsection under [Service registration](./service-bus.spec.md#service-registration):
+
+- **Separate modules.** The declaration and implementation are separate modules; the declaration module is the service's entry point.
+- **Named `declaration` export.** The declaration module must export the `ServiceDeclaration` as a named `declaration` export — the convention the host worker relies on.
+- **`implementationLoader` must use dynamic `import()`.** The loader must load the implementation module via dynamic `import()`, keeping the implementation out of the initial bundle. The user chose "must" over "should" so that lazy loading is normative, not optional. (Test-only in-process spawners that resolve implementations by reference are not affected: they do not use the `implementationLoader` path — the `InProcessHostSpawner` resolves implementations via a `ServiceModuleResolver` function, as documented in the service-bus package journal.)
+- **Declaration must not import the implementation.** The declaration module must not import the implementation module at module-load time; it may import only types and schemas.
+
+### Affected specifications reviewed
+
+- [Service bus](./service-bus.spec.md) — the clarification extends "Service registration" with the module/entry-point convention. No contradiction with existing requirements.
+- [Constrained agent](./constrained-agent.spec.md) — references services and tool categories but not the declaration/module mechanism. Unaffected.
+- `@darkling/service-bus` [package.spec.md](../packages/service-bus/package.spec.md) — documents the host worker convention; the clarification makes the service-package side of that contract normative. Complementary, no contradiction.
+- `@darkling/knowledge-base` [package.spec.md](../packages/knowledge-base/package.spec.md) — the package's service integration has been updated to conform (declaration and implementation split, `./service` subpath, `implementationLoader` wrapping `import()`).
+
 ## Origin
 
 Created as the eighth specification. The README describes the service bus as "lightweight services run across Web Workers and are activated on demand." The user provided additional detail: the `ServiceBroker`/`ServiceHost` architecture, SOAPjr-style envelopes, Transferable object handling, and Zod 4 schemas. Established via the specification workflow.
