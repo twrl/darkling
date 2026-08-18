@@ -236,6 +236,8 @@ Feature: Pagination and limits
 
 The retrieval interface is backed by storage and indexing mechanisms. This specification defines the required indexes; the specific storage technology is an implementation concern.
 
+In the deployment defined by [Usage and deployment](./usage-and-deployment.spec.md#client-side-retrieval-and-caching), the retrieval service runs on the frontend's service bus, with its store and index providers backed by HTTP calls to the backend, which queries a persistent store. The block store is the backend's persistent store; the frontend maintains a cache. This specification is deployment-agnostic: it defines the retrieval interface and required indexes, not where they execute.
+
 ### Block store
 
 The block store holds all compiled documents and content blocks, as defined by [Content model](./content-model.spec.md). It is the source of truth for content.

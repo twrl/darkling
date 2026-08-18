@@ -175,7 +175,7 @@ Working memory persists across interactions. Unlike the budget (which is per-int
 
 - Working memory is scoped to the Guide. It is not shared with the User or the Archive.
 - Working memory is not visible to the User. It is part of the Guide's internal state.
-- Working memory is not part of the Archive's record. It does not survive a reset of the Guide's state beyond what implementation policy defines.
+- Working memory is not part of the Archive's record. It does not survive a reset of the Guide's state beyond what implementation policy defines. The implementation policy for working memory persistence is established by [Usage and deployment](./usage-and-deployment.spec.md#session-state-persistence): persistence is configurable per access tier, with persistent tiers storing state in IndexedDB across visits and ephemeral tiers discarding it at visit end.
 
 ```gherkin
 Feature: Working memory

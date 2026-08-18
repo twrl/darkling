@@ -225,6 +225,7 @@ The following domain specifications define policy parameters and are subject to 
 
 - [Event system](./event-system.spec.md#policy-parameters) — trigger probabilities, budget composition, tool call costs, overspend, and carryover parameters.
 - [Content-first retrieval](./content-first-retrieval.spec.md#policy-parameters) — filterable properties, match semantics, text search mechanism, ranking function, default result limit, and default sort policy.
+- [Usage and deployment](./usage-and-deployment.spec.md#cost-and-abuse-controls) — per-session spend caps, global rate limits (both tier-dependent), and session state persistence policies per access tier. These are resolved at startup from the split configuration (content repository + deployment environment), as defined in [Usage and deployment](./usage-and-deployment.spec.md#configuration).
 
 Other specifications reference policy parameters without a dedicated table:
 
