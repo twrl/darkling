@@ -288,9 +288,9 @@ This specification requires that an overspend mechanism exists. The specific ove
 
 Unspent budget may be carried over into future interactions. When an interaction ends with remaining budget, the carryover policy determines how (if at all) that remaining budget is applied to subsequent interactions.
 
-This specification requires that a carryover mechanism exists. The specific carryover policy — including how much budget is carried over, for how long, and how it combines with the next interaction's fresh budget — is defined by policy and is out of scope for this specification.
+This specification requires that a carryover mechanism exists. The specific carryover policy — including how much budget is carried over, for how long, and how it combines with the next interaction's fresh budget — is defined by policy and is out of scope for this specification. The carryover policy established by [Event system](./event-system.spec.md#carryover) is the governing policy.
 
-Carryover is a deliberate departure from a strictly per-interaction budget: it allows the Guide to accumulate budget when it is quiet and spend it when active, contributing to the apparent autonomy required by [Three-way interaction](./three-way-interaction.spec.md).
+Carryover is a deliberate departure from a strictly per-interaction budget: it links an interaction's spend to the next interaction's budget, contributing to the apparent autonomy required by [Three-way interaction](./three-way-interaction.spec.md).
 
 ## Undispatched tool calls
 

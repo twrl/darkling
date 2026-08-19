@@ -82,6 +82,43 @@ The spec requires a maximum permitted overspend because tool call costs may not 
 
 The spec defines a table of policy parameters that must exist with defined values, but leaves the specific values to implementation. This makes the spec normative about the structure of the policy (which parameters exist, their required properties) while allowing implementation tuning. The table also serves as a checklist for conformance.
 
+## Revision: probabilistic overspend and min(spent, remaining) carryover
+
+The budget policy was substantially revised, via the specification workflow, to replace the maximum-permitted-overspend bound and the signed-carryover-with-caps-and-decay mechanism with two new mechanisms proposed by the user:
+
+- **Carryover** is now $\text{carryover} = \min(\text{spent},\ \text{remaining})$, peaking at half-budget and zero both when declining to act and at full spend, with overspend producing a negative carryover (debt) directly through the `min`. This replaces the earlier "carry the remaining balance, capped and decayed" policy.
+- **Pressure** is a new non-negative, decaying accumulator of overspend, updated per interaction as $p' = \max(0,\ \lfloor p/2 \rfloor - \min(0,\ r))$ — halving on frugal/at-budget interactions, growing by the overspend amount on overspent interactions, clamped to ≥ 0, unbounded above.
+- **Overspend permission** is now a probabilistic gate, not a hard maximum. For a proposed overspend $o$, the probability of dispatch is $\sigma(1 - (\lfloor p/2 \rfloor + o)/\text{base})$, where $p$ is the current pressure and `base` is the budget base policy parameter. The numerator is the pressure that would result if the overspend were permitted (current pressure halved plus the overspend amount), scaled against the base. A failed roll makes the call undispatched and ends the interaction via the constrained-agent exhaustion path.
+
+Through dialogue with the user, the following scope decisions were made:
+
+- **`base_budget` in the sigmoid is the `base` parameter**, not the interaction's total budget, so the gate's scale is stable across interactions regardless of carryover or premium.
+- **Pressure is unbounded above** (no hard cap). The sigmoid asymptotically suppresses overspend as pressure grows; the probability approaches 0 but is never exactly 0, so overspend is never deterministically forbidden. A hard floor was considered and rejected in favour of a purely soft gate.
+- **A denied overspend becomes an undispatched tool call and ends the interaction**, consistent with the existing loop behaviour and the constrained-agent exhaustion path. The model cannot currently observe a budget denial to retry within the interaction; retry-by-model was rejected.
+- **The "accumulate when quiet, spend when active" property is deliberately dropped.** Under `min(spent, remaining)`, declining to act yields zero carryover, so the Guide no longer builds a surplus by being quiet. Apparent autonomy now comes from the variable timing of the flush policy and the probabilistic overspend gate, not from budget hoarding. This is a visible behavioural change from the earlier policy and is intentional.
+
+### Key decisions and rationale
+
+#### Two orthogonal signals
+
+The revision cleanly separates two concerns that the earlier signed-carryover policy conflated: carryover moves surplus/debt into the base budget (a budget-amount effect), while pressure is a separate, non-negative signal that governs only _whether_ future overspend is permitted (a permission effect). Overspend debt is now encoded once, in the negative carryover, rather than in both a signed carryover and a separate debt cap.
+
+#### Soft, pressure-sensitive gate
+
+The probabilistic gate is a deliberate departure from a deterministic overspend bound. Tool call costs may not be known precisely until dispatch, and a hard bound either permits a fixed overspend or forbids it. The sigmoid gate makes overspend progressively less likely as the Guide overspends more, which is a smoother, more naturalistic control than a cliff. Using the budget base as the denominator keeps the gate's steepness consistent; using the interaction total would make the gate tighter when in debt (a double-penalty with the negative carryover).
+
+#### The `min` shape's incentive
+
+The `min(spent, remaining)` shape rewards considered, partial spend (peaking at half-budget) rather than rewarding hoarding or full spend. This was the user's explicit intent: the Guide should be rewarded for spending roughly within its means, not for declining to act. The earlier "reward hoarding" policy is gone.
+
+#### Pressure replaces the debt decay
+
+The earlier policy had a separate carryover decay toward zero for both surplus and debt. The revision removes that: debt is repaid through the negative carryover reducing the next budget (which makes further overspend more likely, raising pressure), and pressure's halving-on-frugal-spend is the only decay. This is simpler — one decay mechanism (pressure halving) rather than a separate carryover decay with its own rate and threshold parameters.
+
+### Spec consistency
+
+The constrained-agent spec's budget mechanism language (exhaustion, undispatched calls, "policy-based overspend/carryover mechanisms") is unaffected; it defers the specific policy to this spec. The one stale rationale line in the constrained-agent spec ("accumulate budget when it is quiet and spend it when active") was softened to avoid contradicting the new policy while staying within its mechanism-only scope. The policy-parameter table was reduced (max permitted overspend, max/min carryover, carryover decay removed; budget base's description updated to note it is the gate's denominator). The conformance clause was updated to describe the new gate and carryover shape.
+
 ## Gaps and ambiguities
 
 - **UI specification.** The spec references a UI specification for event types and payloads, which does not yet exist. The boundary between "event structure" (this spec) and "event types" (UI spec) should be confirmed when the UI spec is established.
@@ -89,4 +126,4 @@ The spec defines a table of policy parameters that must exist with defined value
 - **Event queue capacity.** The spec does not define a maximum queue size or behaviour under extreme event accumulation. This may need clarification if the Guide is inactive for extended periods and low-probability events accumulate indefinitely.
 - **Cost model details.** The spec states costs may be fixed or variable but does not prescribe the cost model. The specific cost assignment is a policy parameter, but the structure of variable costs (e.g. proportional to retrieval size) may need further specification.
 - **Premium function.** The spec states the premium depends on event types in the queue but does not prescribe the premium function. This is a policy parameter, but the relationship between event types and premium values may need further specification.
-- **Carryover decay details.** The spec requires decay toward zero but does not prescribe the decay function (linear, exponential, per-interaction, per-time). This is a policy parameter.
+- **Carryover shape vs decay.** The carryover is now $\min(\text{spent},\ \text{remaining})$ (no decay parameter); decay of overspend debt is handled by pressure's per-interaction halving, not by a carryover decay. Whether the half-budget peak and the loss of quiet-accumulation are the desired long-term dynamics should be revisited once the Guide's behaviour is observable.

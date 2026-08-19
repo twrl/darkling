@@ -157,7 +157,7 @@ Each interaction's budget is composed of three parts:
 
 - **base** — a fixed budget amount assigned to every interaction;
 - **premium** — an additional amount determined by the event types in the flushed event queue, reflecting the expected cost of responding to those events;
-- **carryover** — the carried-over balance from previous interactions, which may be positive (unspent budget) or negative (recent overspend).
+- **carryover** — the carried-forward balance from the immediately previous interaction, which may be positive (partial spend) or negative (overspend).
 
 The interaction's budget is:
 
@@ -178,63 +178,103 @@ Each tool call type has an assigned cost. The cost represents the resource expen
 
 ### Overspend
 
-A tool call may cause the cumulative cost to exceed the budget. The overspend policy determines the behaviour when this occurs.
+A tool call may cause the cumulative cost to exceed the budget — for example, when a tool call's cost is not known precisely until dispatch. The overspend policy determines whether such a call is dispatched.
 
-- The overspend policy must define a maximum permitted overspend: the cumulative cost may exceed the budget by at most this amount.
-- When the maximum permitted overspend is reached, no further tool calls must be dispatched, as defined by [Constrained agent](./constrained-agent.spec.md).
-- The maximum permitted overspend is a policy parameter, as defined in [Policy parameters](#policy-parameters).
+The Guide accumulates a non-negative **pressure** value across interactions that records recent overspend. Pressure is a decaying accumulator: it grows when an interaction overspends and decays when an interaction is frugal, so sustained frugal behaviour relieves pressure while sustained overspend raises it. Pressure is defined in [Pressure](#pressure).
 
-The overspend policy exists because tool call costs may not be known precisely until dispatch: a retrieval may return more content than anticipated, or a service may incur variable latency. The policy permits bounded overspend to accommodate this uncertainty while preventing unbounded cost.
+Whether a tool call that would exceed the budget is dispatched is determined by a **probabilistic overspend gate** applied at the moment of dispatch. The gate computes the pressure that _would_ result if the overspend were permitted — i.e. the current pressure halved (its decay step) plus the proposed overspend — and scales that against the budget base. For a proposed overspend $o$ (the amount by which the call would exceed the remaining budget) given current pressure $p$ and the budget base $b$, the probability that the call is permitted is:
+
+$$\text{probability\_allowed} = \sigma\!\left(1 - \frac{\lfloor p/2 \rfloor + o}{b}\right)$$
+
+where $\sigma$ is the logistic sigmoid. The numerator $\lfloor p/2 \rfloor + o$ is exactly the pressure that would be recorded at the end of the interaction if this overspend were permitted (the pressure decay step applied to the current pressure, plus the overspend amount), so the gate compares the prospective resulting pressure to the budget base.
+
+- The gate is applied per attempted overspend. A roll against $\text{probability\_allowed}$ determines whether the call is dispatched.
+- If the roll succeeds, the call is dispatched and its cost consumed, increasing the interaction's overspend.
+- If the roll fails, the call is not dispatched and becomes an undispatched tool call, as defined by [Constrained agent](./constrained-agent.spec.md#undispatched-tool-calls); the interaction ends via the exhaustion path, as defined by [Exhaustion](./constrained-agent.spec.md#exhaustion).
+- The gate is a soft bound: overspend is never deterministically permitted (the probability is always less than 1) and, because pressure is unbounded above, sustained overspend drives the probability toward 0 but never forbids overspend absolutely. There is no fixed maximum permitted overspend amount.
+- The base $b$ used in the gate is the budget base policy parameter, not the interaction's total budget, so the gate's scale is stable across interactions regardless of carryover or premium.
+
+The gate exists because tool call costs may not be known precisely until dispatch: a retrieval may return more content than anticipated, or a service may incur variable latency. The probabilistic gate accommodates this uncertainty while making sustained overspend progressively less likely, in proportion to how much the Guide has recently overspent.
+
+### Pressure
+
+Pressure is a non-negative value carried across interactions that records recent overspend. It is the input to the probabilistic overspend gate, as defined in [Overspend](#overspend).
+
+At the end of each interaction, with $r$ the interaction's remaining budget ($\text{total} - \text{spent}$, which is negative on overspend), pressure is updated as:
+
+$$p' = \max\!\left(0,\ \left\lfloor \frac{p}{2} \right\rfloor - \min(0,\ r)\right)$$
+
+- If the interaction was frugal or on budget ($r \geq 0$), then $\min(0, r) = 0$ and pressure is halved toward zero (decay).
+- If the interaction overspent ($r < 0$, with overspend $|r|$), then $\min(0, r) = r$ and pressure becomes $\lfloor p/2 \rfloor + |r|$ (halving the prior pressure, then adding the overspend amount).
+- Pressure is clamped to be non-negative; it may never go negative (there is no "credit" state).
+
+Pressure replaces the maximum-permitted-overspend bound and the signed-carryover debt mechanism of earlier drafts. It is unbounded above; the sigmoid gate asymptotically suppresses overspend as pressure grows, so a hard cap is not required.
 
 ### Carryover
 
-The carryover is the balance of unspent or overspent budget from previous interactions, carried into the next interaction. Carryover may be positive or negative.
+The carryover is the balance carried forward from the immediately previous interaction into the next interaction's budget. Carryover may be positive or negative.
 
-- **Positive carryover** — when an interaction ends with unspent budget, the remaining amount is carried forward as positive carryover, increasing the next interaction's budget.
-- **Negative carryover** — when an interaction ends with overspend (cumulative cost exceeded the budget), the overspent amount is carried forward as negative carryover, reducing the next interaction's budget. This creates a debt that the Guide must work within until the carryover returns to positive or zero.
+At the end of an interaction, with $s$ the cost spent during the interaction and $r$ the remaining budget ($\text{total} - s$), the carryover is:
 
-The carryover policy must define:
+$$\text{carryover} = \min(s,\ r)$$
 
-- a **maximum carryover** — the positive carryover is capped at this value;
-- a **minimum carryover** (maximum debt) — the negative carryover is capped at this value;
-- a **carryover decay** — carried-over balance that is not used within a defined period or number of interactions decays toward zero, reducing both positive and negative carryover over time.
+- The carryover peaks at half the interaction's budget (when $s = r = \text{total}/2$) and is zero both when the Guide declines to act ($s = 0$) and when it spends exactly its budget ($s = \text{total}$).
+- When the interaction overspends ($s > \text{total}$, so $r < 0$), the carryover is negative: $\min(s, r) = r$, carrying the debt forward and reducing the next interaction's budget. Overspend debt is therefore encoded once, in the carryover; pressure (a separate, non-negative signal) governs only whether future overspend is permitted, not the budget amount.
+- There is no separate cap on carryover (positive or negative) and no time-based decay: the $\min$ shape itself bounds carryover to $[-\text{total}, \text{total}/2]$, and overspend debt is naturally repaid because a negative carryover reduces the next budget, which in turn raises the chance of further overspend raising pressure rather than persisting debt indefinitely.
 
-The carryover decay ensures that neither surplus nor debt persists indefinitely: a quiet period erodes accumulated surplus, and time erodes accumulated debt.
-
-Carryover contributes to the apparent autonomy required by [Three-way interaction](./three-way-interaction.spec.md): the Guide may accumulate budget when the User is quiet and spend it when active, producing responses that appear more considered and less uniformly constrained. Negative carryover ensures that overspend in one interaction constrains the next, preventing sustained over-budget behaviour.
+The carryover shape is a deliberate departure from a strictly per-interaction budget and from a "reward hoarding" policy: it rewards considered, partial spend rather than declining to act, and it encodes overspend debt directly into the next budget. Apparent autonomy is provided by the variable timing of the flush policy and the probabilistic overspend gate, not by accumulating surplus during quiet periods.
 
 ```gherkin
 Feature: Budget policy
-  Rule: Budget is base + premium + carryover, with bounded overspend and signed carryover
+  Rule: Budget is base + premium + carryover; overspend is gated by a pressure-driven probability
 
-  Scenario: Positive carryover from unspent budget
-    Given the Guide completes an interaction with unspent budget R
-    And R does not exceed the maximum carryover
+  Scenario: Carryover peaks at half-budget spend
+    Given an interaction with total budget T spends exactly T/2
     When the next interaction is triggered
-    Then the carryover must be R
-    And the next interaction's budget must be base + premium + R
+    Then the carryover must be T/2
+    And the next interaction's budget must be base + premium + T/2
 
-  Scenario: Negative carryover from overspend
-    Given the Guide completes an interaction with overspend D
-    And D does not exceed the minimum carryover
+  Scenario: Declining to act carries nothing forward
+    Given an interaction spends nothing (s = 0)
+    When the next interaction is triggered
+    Then the carryover must be 0
+    And the next interaction's budget must be base + premium
+
+  Scenario: Overspend carries debt forward
+    Given an interaction with total budget T overspends by D (s = T + D)
     When the next interaction is triggered
     Then the carryover must be -D
     And the next interaction's budget must be base + premium - D
 
-  Scenario: Carryover decays toward zero
-    Given the Guide has positive carryover C
-    And no interaction has been triggered for a period exceeding the decay threshold
-    When the next interaction is triggered
-    Then the carryover must be less than C
-    And the next interaction's budget must be base + premium + decayed carryover
+  Scenario: Pressure grows on overspend and decays on frugal spend
+    Given the current pressure is P
+    And an interaction overspends by D
+    When the interaction ends
+    Then the pressure must be (P / 2) + D
+    Given the current pressure is P
+    And an interaction spends within budget
+    When the interaction ends
+    Then the pressure must be P / 2
 
-  Scenario: Overspend is bounded
-    Given the Guide has remaining budget B
-    And B is less than the cost of the next tool call
-    And the overspend would not exceed the maximum permitted overspend
-    When the Guide dispatches the tool call
-    Then the tool call must be dispatched
-    And the cumulative cost must exceed the budget by at most the maximum permitted overspend
+  Scenario: Pressure is non-negative
+    Given the current pressure is 0
+    And an interaction spends within budget
+    When the interaction ends
+    Then the pressure must be 0
+
+  Scenario: Overspend is gated by a pressure-driven probability
+    Given the Guide attempts a tool call that would overspend by O
+    And the current pressure is P
+    When the gate is evaluated
+    Then the probability of the call being permitted must be sigmoid(1 - ((P / 2) + O) / base)
+    And the call must be dispatched iff the roll succeeds
+    And a failed roll must make the call undispatched and end the interaction
+
+  Scenario: Sustained overspend suppresses further overspend
+    Given the Guide has overspent repeatedly such that pressure is high
+    When the Guide attempts a further overspend
+    Then the probability of the call being permitted must be lower than for a Guide with low pressure
+    But the probability must not be exactly 0
 ```
 
 ## Policy parameters
@@ -243,18 +283,16 @@ The event system is governed by a set of policy parameters. This specification d
 
 The following policy parameters must be defined:
 
-| Parameter                          | Description                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Trigger probability per event type | The probability of flushing when an event of that type is added to the queue, in the range [0.0, 1.0]. |
-| Budget base                        | The fixed budget amount assigned to every interaction.                                                 |
-| Budget premium function            | The function that determines the premium based on the event types in the flushed queue.                |
-| Tool call costs                    | The cost assigned to each tool call type.                                                              |
-| Maximum permitted overspend        | The maximum amount by which cumulative cost may exceed the budget.                                     |
-| Maximum carryover                  | The cap on positive carryover (unspent budget carried forward).                                        |
-| Minimum carryover                  | The cap on negative carryover (overspend debt carried forward).                                        |
-| Carryover decay                    | The rate and threshold at which carried-over balance decays toward zero.                               |
+| Parameter                          | Description                                                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Trigger probability per event type | The probability of flushing when an event of that type is added to the queue, in the range [0.0, 1.0].           |
+| Budget base                        | The fixed budget amount assigned to every interaction; also the denominator of the probabilistic overspend gate. |
+| Budget premium function            | The function that determines the premium based on the event types in the flushed queue.                          |
+| Tool call costs                    | The cost assigned to each tool call type.                                                                        |
 
 All policy parameters must have defined values. An implementation must not leave any parameter undefined.
+
+The probabilistic overspend gate is fully determined by the budget base and the current pressure; it introduces no additional policy parameter. The gate's randomness is provided by the same roll mechanism used for the flush policy; an implementation must provide a deterministic, injectable randomness source so that the gate is testable.
 
 ## Conformance
 
@@ -268,6 +306,6 @@ An implementation conforms to this specification when:
 - failed rolls leave events in the queue, producing microbatching as accumulated events flush together on a successful roll;
 - probabilistic flush produces variable response timing (apparent spontaneity);
 - each flush triggers at most one interaction, as defined by [Constrained agent](./constrained-agent.spec.md);
-- the budget for each interaction is composed of base + premium + carryover, where premium depends on event types in the queue and carryover may be positive or negative;
-- the budget policy defines tool call costs, a maximum permitted overspend, and a carryover policy with maximum carryover, minimum carryover, and decay;
+- the budget for each interaction is composed of base + premium + carryover, where premium depends on event types in the queue and carryover is $\min(\text{spent},\ \text{remaining})$ from the previous interaction (positive for partial spend, negative for overspend);
+- the budget policy defines tool call costs, a pressure value that accumulates overspend and decays on frugal spend (non-negative, unbounded), and a probabilistic overspend gate whose probability is $\sigma(1 - ((\text{pressure}/4) + \text{proposed\_overspend})/\text{base})$, with a failed gate making the call undispatched and ending the interaction;
 - all policy parameters have defined values.

@@ -1,0 +1,30 @@
+{
+  "name": "@darkling/guide",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./service": "./src/service-declaration.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@darkling/service-bus": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@darkling/service-bus": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@darkling/service-bus": "workspace:*",
+    "@repo/eslint-config": "workspace:*"
+  }
+}
