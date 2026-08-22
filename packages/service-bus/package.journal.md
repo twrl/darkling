@@ -30,6 +30,10 @@ The spec requires validation at the broker/host boundary (parameters before disp
 
 The spec's journal notes an undefined error taxonomy. The implementation defines a `ServiceBusError` base class with subclasses for `ValidationError`, `ReturnValidationError`, `HostUnavailableError`, `ServiceNotRegisteredError`, and `FunctionNotDeclaredError`. Errors are serialised to plain objects for transport across worker boundaries and deserialised on the client side via `deserialiseError`.
 
+#### Host serialises all `ServiceBusError` subclasses, not just `ValidationError`
+
+The host's `catch` block originally special-cased `ValidationError` (calling `toJSON()`) and serialised every other thrown error as a generic `{ code: 'SERVICE_ERROR' }`. This dropped the `code` of any other `ServiceBusError` subclass thrown by a service implementation (e.g. the state manager's `StaleBasisError` / `StateInvariantError`), round-tripping them as generic `SERVICE_ERROR`s. Changed the catch to serialise any `ServiceBusError` via `toJSON()`, preserving the subclass `name` and `code` across the worker boundary. `ValidationError` continues to round-trip correctly since it extends `ServiceBusError`. Non-`ServiceBusError` throws still fall back to the generic `SERVICE_ERROR` shape. This is a general improvement that lets any service throw typed `ServiceBusError` subclasses and have their codes survive the boundary, which the `state-manager` authority relies on.
+
 ### Call timeout as host-failure detection
 
 The spec requires the `ServiceClient` to reject the caller's promise if a host is unavailable or fails to respond. The implementation uses a configurable call timeout (default 30s) as the host-failure detection mechanism: if no `return` or `error` message arrives within the timeout, the promise is rejected with `HostUnavailableError`.

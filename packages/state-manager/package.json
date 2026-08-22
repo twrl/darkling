@@ -1,0 +1,49 @@
+{
+  "name": "@darkling/state-manager",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./service": "./src/service-declaration.ts",
+    "./lit": "./src/lit/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "dependencies": {
+    "@darkling/service-bus": "workspace:*",
+    "immer": "^10.1.7",
+    "signal-polyfill": "^0.2.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@darkling/service-bus": "workspace:*",
+    "lit": "^3.0.0",
+    "@lit/context": "^1.0.0",
+    "@lit-labs/signals": "^0.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@darkling/service-bus": {
+      "optional": true
+    },
+    "lit": {
+      "optional": true
+    },
+    "@lit/context": {
+      "optional": true
+    },
+    "@lit-labs/signals": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@darkling/service-bus": "workspace:*",
+    "@lit-labs/signals": "^0.3.0",
+    "@lit/context": "^1.1.6",
+    "@repo/eslint-config": "workspace:*",
+    "lit": "^3.3.3"
+  }
+}

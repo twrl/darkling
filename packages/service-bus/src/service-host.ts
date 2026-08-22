@@ -1,5 +1,5 @@
 import type { ServiceDeclaration } from './declaration.js';
-import { ReturnValidationError, ValidationError } from './errors.js';
+import { ReturnValidationError, ServiceBusError, ValidationError } from './errors.js';
 import type { Envelope } from './envelope.js';
 import type { Transport } from './transport.js';
 import type { ServiceCallContext } from './service-call-context.js';
@@ -141,7 +141,7 @@ export class ServiceHost {
         messageId,
         service,
         functionName,
-        error instanceof ValidationError
+        error instanceof ServiceBusError
           ? (error.toJSON() as unknown as Record<string, unknown>)
           : {
               name: error instanceof Error ? error.constructor.name : 'Error',
