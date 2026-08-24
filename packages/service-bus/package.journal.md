@@ -46,6 +46,12 @@ The spec states the broker decides when to launch a new host versus activating a
 
 The `transferables` field in the envelope head is passed through verbatim. `createWorkerTransport` passes the resolved transferables as the `transfer` parameter to `postMessage`. The in-process transport ignores transferables (no ownership transfer semantics in-process). The service interface remains transparent to the transfer mechanism, as required.
 
+### Worker entry point subpath exports
+
+The package spec states that the worker entry points (`broker-worker.ts`, `host-worker.ts`) "are not exported from the package index (they are worker scripts, not library API)" and are "consumed by bundlers as worker entry points via `new Worker(new URL('./broker-worker.ts', import.meta.url))`". This pattern works when the consumer can resolve a relative URL to a file within the same package, but when a separate package (e.g. the frontend) imports the worker entry point via a bare specifier (`@darkling/service-bus/src/broker-worker.js`), Vite's resolver rejects it because `src/broker-worker.ts` is not in the package's `exports` map.
+
+**Decision:** Added `./broker-worker` and `./host-worker` subpath exports to `package.json`, mapping to `./src/broker-worker.ts` and `./src/host-worker.ts` respectively. The frontend's worker wrapper files (`apps/frontend/src/workers/broker-worker.ts`, `host-worker.ts`) now import via these subpaths (`@darkling/service-bus/broker-worker`, `@darkling/service-bus/host-worker`). The spec's statement that the entry points are "not exported from the package index" remains true — they are not in the `.` barrel; the subpaths are separate export entries for the worker scripts. The spec's `new URL('./broker-worker.ts', import.meta.url)` example describes the main-thread side (creating the `Worker` from a URL); the subpath export is needed for the worker-side `import` of the service-bus worker script. This is a package-consumption concern, not a spec change.
+
 ## Gaps and ambiguities
 
 - **Shared-host activation.** The `preferSharedHost` metadata flag is declared but the broker does not yet activate a service on an existing compatible host; it always launches a new host. This is a policy refinement to implement when multi-service hosts are needed.

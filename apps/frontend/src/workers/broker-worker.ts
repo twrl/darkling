@@ -8,4 +8,4 @@
  * @see specs/service-bus.spec.md#worker-topology
  */
 
-import '@darkling/service-bus/src/broker-worker.js';
+import '@darkling/service-bus/broker-worker';

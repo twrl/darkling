@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./lit": "./src/lit/index.ts"
+    "./lit": "./src/lit/index.ts",
+    "./broker-worker": "./src/broker-worker.ts",
+    "./host-worker": "./src/host-worker.ts"
   },
   "scripts": {
     "lint": "eslint .",

@@ -9,4 +9,4 @@
  * @see specs/service-bus.spec.md#worker-topology
  */
 
-import '@darkling/service-bus/src/host-worker.js';
+import '@darkling/service-bus/host-worker';
