@@ -52,12 +52,14 @@ self.addEventListener('message', async (event: MessageEvent) => {
     for (const { serviceId, moduleSpecifier } of services) {
       // Dynamically import the declaration module to obtain the live
       // ServiceDeclaration (with Zod schemas and the implementationLoader).
-      // The @vite-ignore comment tells bundlers not to statically analyse
-      // this import; the moduleSpecifier must resolve at runtime.
+      // @vite-ignore tells bundlers not to statically analyse this import;
+      // the moduleSpecifier must resolve at runtime. The declaration module
+      // exports the ServiceDeclaration as its default export.
       const module = (await import(/* @vite-ignore */ moduleSpecifier)) as {
-        declaration: ServiceDeclaration;
+        default: ServiceDeclaration;
+        declaration?: ServiceDeclaration;
       };
-      const declaration = module.declaration;
+      const declaration = module.default ?? module.declaration;
       if (!declaration) {
         throw new Error(`Module "${moduleSpecifier}" does not export a declaration`);
       }

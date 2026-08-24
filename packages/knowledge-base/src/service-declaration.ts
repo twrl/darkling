@@ -142,3 +142,5 @@ export const declaration: ServiceDeclaration = {
  * name for direct consumers.
  */
 export const knowledgeBaseServiceDeclaration: ServiceDeclaration = declaration;
+
+export default declaration;

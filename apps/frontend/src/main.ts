@@ -1,0 +1,72 @@
+/**
+ * The frontend entry point: imports the UI components, the worker host elements,
+ * and mounts the <darkling-app>.
+ *
+ * @see specs/usage-and-deployment.spec.md#bootstrap-sequence
+ */
+
+import './ui/darkling-app.js';
+import './ui/scene.js';
+import './ui/document-tablet.js';
+import './ui/non-document-tablet.js';
+import './ui/guide-avatar.js';
+import './ui/address-input.js';
+
+// The service bus + state manager host elements.
+import '@darkling/service-bus/lit';
+import '@darkling/state-manager/lit';
+
+import type { ServiceBusHostOptions } from '@darkling/service-bus/lit';
+import type { StateManagerHostOptions } from '@darkling/state-manager/lit';
+
+// The app is mounted in index.html as <darkling-app>.
+// Configure the bus and state manager options via the element's properties.
+const app = document.querySelector('darkling-app');
+if (app) {
+  const brokerWorkerUrl = new URL('./workers/broker-worker.ts', import.meta.url).href;
+  const hostWorkerUrl = new URL('./workers/host-worker.ts', import.meta.url).href;
+
+  // Service registrations: the module specifiers point to the re-export
+  // modules that default-export each service declaration. The host worker
+  // dynamically imports these by module specifier when activating services.
+  const guideDeclarationUrl = new URL('./workers/guide-declaration.ts', import.meta.url).href;
+  const retrievalDeclarationUrl = new URL('./workers/retrieval-declaration.ts', import.meta.url)
+    .href;
+  const stateManagerDeclarationUrl = new URL(
+    './workers/state-manager-declaration.ts',
+    import.meta.url,
+  ).href;
+
+  const busOptions: ServiceBusHostOptions = {
+    brokerWorkerUrl,
+    hostWorkerUrl,
+    registrations: [
+      { id: 'guide', moduleSpecifier: guideDeclarationUrl },
+      { id: 'knowledge-base', moduleSpecifier: retrievalDeclarationUrl },
+      { id: 'state-manager', moduleSpecifier: stateManagerDeclarationUrl },
+    ],
+  };
+
+  const stateOptions: StateManagerHostOptions = {
+    slices: ['interface'],
+    channelName: 'darkling-state',
+  };
+
+  // Set the options as reactive properties (not attributes) so Lit receives
+  // the typed objects, not JSON strings.
+  (app as unknown as { busOptions: ServiceBusHostOptions }).busOptions = busOptions;
+  (app as unknown as { stateOptions: StateManagerHostOptions }).stateOptions = stateOptions;
+}
+
+// Register the Service Worker for transparent token handling, as defined by
+// [Usage and deployment](../../specs/usage-and-deployment.spec.md#service-worker).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register(new URL('./sw.ts', import.meta.url), { type: 'module' })
+      .catch(() => {
+        // Service Worker registration failed; the app still works but token
+        // handling falls back to direct fetch (without the bearer header).
+      });
+  });
+}

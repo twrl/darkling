@@ -64,4 +64,6 @@ export const declaration: ServiceDeclaration = {
   },
 };
 
+export default declaration;
+
 export type { GuideServiceDeclaration } from './service-implementation.js';

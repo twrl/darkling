@@ -48,6 +48,11 @@ export class RetrievalEngine {
     private readonly policy: RetrievalPolicy = DEFAULT_RETRIEVAL_POLICY,
   ) {}
 
+  /** The containment index, exposed for document-tree traversal. */
+  getContainmentIndex(): ContainmentIndex {
+    return this.containmentIndex;
+  }
+
   // --- Retrieval by ID ---
 
   getDocumentsById(ids: DocumentId[]): ByIdResult<DocumentResult> {

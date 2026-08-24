@@ -1,5 +1,5 @@
 import type { ServiceDeclaration } from './declaration.js';
-import { ReturnValidationError, ServiceBusError, ValidationError } from './errors.js';
+import { ReturnValidationError, ServiceBusError } from './errors.js';
 import type { Envelope } from './envelope.js';
 import type { Transport } from './transport.js';
 import type { ServiceCallContext } from './service-call-context.js';

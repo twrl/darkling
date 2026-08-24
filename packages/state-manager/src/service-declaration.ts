@@ -81,3 +81,5 @@ export const declaration: ServiceDeclaration = {
     return mod.StateManagerService;
   },
 };
+
+export default declaration;
