@@ -145,3 +145,15 @@ The user was unsure whether this lives in the usage-and-deployment spec or the c
 - **Multiple concurrent Visitors on the same browser.** The per-browser state model assumes one Visitor per browser. Multiple tabs share the IndexedDB store and Service Worker; whether they share or conflict on session state is not defined. An implementation concern.
 - **Worker failure recovery.** The spec does not address what happens if a Web Worker (broker, Guide, retrieval) or the Service Worker crashes. Recovery and restart semantics are an implementation concern.
 - **Token format choice (PASETO vs JWT).** The spec names both as options. The specific choice is an implementation concern; it may warrant clarification.
+
+## Session start event
+
+Added a bootstrap-sequence step and a Gherkin assertion: after the UI is
+mounted, the UI emits `session_start` (trigger probability 1.0), which flushes
+the queue and triggers the Guide's first interaction. This closes the gap that
+the bootstrap sequence previously said "the Guide begins consuming events and
+responding" without producing any event to trigger the first interaction.
+
+The event type is owned by the UI spec (ui.spec.md#session-start); the framing
+(Visitor-initiated, not a system event) and the empty payload / once-per-load /
+emitted-before-Visitor-input decisions are recorded in ui.journal.md.

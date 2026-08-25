@@ -310,8 +310,18 @@ The UI must produce the following high-level semantic event types:
 | `direct_address` | The Visitor directly addresses the Guide (via the address input, defined in [Addressing the Guide](#addressing-the-guide)). | `{ text: string }` — the address text. |
 | `scroll` | The Visitor scrolls within the active document's tablet, changing the blocks in view. | `{ document: DocumentId, blocks: BlockId[] }` — the document and the block IDs brought into view by the scroll. |
 | `avatar_repositioned` | The Visitor drags the avatar and releases; the avatar snaps to the nearest fixed position, as defined in [Avatar position and visibility](#avatar-position-and-visibility). | `{ position: PositionId }` — the snapped fixed position. |
+| `session_start` | The Visitor arrives at the Archive: the frontend has completed bootstrap and is ready. Emitted exactly once per page load, before the UI produces any other event, as defined in [Session start](#session-start). | `{ }` — empty payload. |
 
 `DocumentId` and `BlockId` are the branded string identifiers defined by [Content model](./content-model.spec.md). `PositionId` is a name from the fixed avatar position set, as defined in [Avatar position and visibility](#avatar-position-and-visibility).
+
+### Session start
+
+The `session_start` event marks the Visitor's arrival at the Archive. It is produced by the frontend once, when bootstrap is complete and the frontend is ready, before the UI produces any Visitor-activity event. It is a Visitor-initiated event — the Visitor arriving is activity — not a system event.
+
+- `session_start` is emitted exactly once per page load. A page reload begins a new session and emits `session_start` again, since the Guide worker is freshly started each load.
+- `session_start` is emitted before the UI accepts Visitor input that produces other events, so it is the sole event in the queue when its flush triggers the Guide's first interaction.
+- `session_start` has a trigger probability of 1.0, as defined in [Event system](./event-system.spec.md#trigger-probability): the Guide is always triggered once at session start.
+- The payload is empty. Session context the Guide may need is available through other channels: the status object carries working memory and budget, as defined by [Constrained agent](./constrained-agent.spec.md#interaction-input), and the Guide may retrieve the Archive's contents through the retrieval tools, as defined by [Content-first retrieval](./content-first-retrieval.spec.md).
 
 ### Event sources and non-events
 
@@ -365,6 +375,14 @@ Feature: Events
     When the UI applies it
     Then no avatar_repositioned event must be produced
     Because Guide actions do not produce events
+
+  Scenario: The Visitor's arrival produces session_start and triggers the Guide
+    Given the frontend has completed bootstrap and is ready
+    When the UI emits session_start
+    Then a session_start event must be produced with an empty payload
+    And it must be the sole event in the queue
+    And the queue must be flushed, triggering the Guide's first interaction
+    Because the Visitor arriving at the Archive is Visitor activity
 ```
 
 ## Addressing the Guide

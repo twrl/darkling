@@ -112,3 +112,14 @@ Removed the earlier placeholder `public/agents/darkling/` assets (agent.json +
 sprite.png); Clippy from the package replaces them. `dataUrlToBlob` was exported
 and tested (5 new tests; avatar suite now 15 tests). GAPS: sounds still not
 played; auto-idle (playing a random Idle* animation) is a follow-up.
+
+## Spec change: session_start event
+
+The root specs now establish a `session_start` event (ui.spec.md#session-start,
+amended via the specification workflow). The frontend package spec's bootstrap
+sequence was updated to add a step: after the UI is mounted, it emits
+`session_start` (trigger probability 1.0), which flushes the event queue and
+triggers the Guide's first interaction. Implementation wiring (adding
+`session_start` to `event-types.ts`, emitting it from the bootstrap path, and
+gating Visitor-input production until it is emitted) is a follow-up against the
+now-established spec; not yet implemented.

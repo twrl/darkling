@@ -30,6 +30,7 @@ On page load, the frontend bootstraps the runtime, as defined by [Usage and depl
 4. The state manager authority service is registered on the bus (running in a worker).
 5. The UI-control and avatar-interaction tools are registered on the bus.
 6. The UI is mounted on the main thread, producing events as the Visitor interacts.
+7. The UI emits `session_start` (trigger probability 1.0), flushing the event queue and triggering the Guide's first interaction, as defined by [User interface](../../specs/ui.spec.md#session-start).
 
 ## Structural contract
 

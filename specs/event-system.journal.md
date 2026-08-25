@@ -127,3 +127,18 @@ The constrained-agent spec's budget mechanism language (exhaustion, undispatched
 - **Cost model details.** The spec states costs may be fixed or variable but does not prescribe the cost model. The specific cost assignment is a policy parameter, but the structure of variable costs (e.g. proportional to retrieval size) may need further specification.
 - **Premium function.** The spec states the premium depends on event types in the queue but does not prescribe the premium function. This is a policy parameter, but the relationship between event types and premium values may need further specification.
 - **Carryover shape vs decay.** The carryover is now $\min(\text{spent},\ \text{remaining})$ (no decay parameter); decay of overspend debt is handled by pressure's per-interaction halving, not by a carryover decay. Whether the half-budget peak and the loss of quiet-accumulation are the desired long-term dynamics should be revisited once the Guide's behaviour is observable.
+
+## Session start event
+
+Added `session_start` to the examples of probability-1.0 events in the
+Trigger probability section, and a "Session start triggers the Guide's first
+interaction" scenario to the Flush policy Gherkin. The event type and payload
+are owned by the UI spec (ui.spec.md#session-start); this spec's change is
+acknowledgement only — no structural change to the event model.
+
+The framing decision (recorded in ui.journal.md) is that `session_start` is a
+Visitor-initiated event (the Visitor arriving), not a system event, so no
+amendment to the "events are produced in response to User activity" source
+model was required. This closes the bootstrap→Guide-trigger gap: previously
+the spec produced no event at session start to flush the queue for the first
+interaction.

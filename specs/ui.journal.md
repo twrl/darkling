@@ -150,3 +150,53 @@ The user selected: event types & payloads, the rendering pipeline, the `interfac
 - `content-first-retrieval.spec.md` — owns the retrieval interface (used by the Guide, not directly by the UI). This spec uses the ToC (owned by `usage-and-deployment.spec.md`) for Visitor navigation.
 - `usage-and-deployment.spec.md` — owns the runtime topology (main thread, workers), Service Worker, cap enforcement, and ToC. This spec conforms to its main-thread requirement and presents the cap in-world.
 - `annotations.spec.md` — annotations are private to the Guide; this spec requires the UI not render them.
+## Session start event
+
+Added the `session_start` event type to the event vocabulary, with an empty
+payload, emitted once per page load when bootstrap is complete. This closes a
+gap: the existing specs established the event system and the Guide's
+event-triggered interaction model, but did not specify any mechanism by which
+the Guide is triggered at the start of a session — the bootstrap sequence
+mounted the UI and said "the Guide begins consuming events," but produced no
+event to flush the queue for the first interaction.
+
+### Framing: Visitor-initiated, not a system event
+
+The initial framing question was whether `session_start` is a system event
+(produced by the frontend) or a Visitor-activity event. The user's resolution:
+the Visitor *arriving* at the Archive is itself Visitor activity, so
+`session_start` is a Visitor-initiated event, not a system event. This avoids
+any amendment to the event system's "events are produced in response to User
+activity" source model — no exception clause is needed; arriving is activity.
+
+### Decisions (per the spec-workflow dialogue)
+
+- **Empty payload.** The Guide can fetch anything it needs via retrieval tools,
+  and the status object already carries working memory and budget. Carrying
+  session context (tier, ToC summary, restored working memory) would create a
+  "session context" shape no spec currently defines. Kept empty; can widen
+  later without breaking anything.
+- **Once per page load.** A page reload re-emits `session_start`, since the
+  Guide worker is freshly started each load — a reload genuinely is a new
+  session from the Guide's perspective. Working-memory persistence survives
+  via its own mechanism regardless.
+- **Emitted before the UI accepts Visitor input.** Guarantees `session_start`
+  is the sole event in the queue when its flush triggers the Guide's first
+  interaction. Implementation consequence: the address input / ToC are not
+  interactive until `session_start` is emitted; this is unobservable to the
+  Visitor in practice. (The alternative — emit "as early as possible" without
+  gating input — would allow a race where a fast Visitor action lands first;
+  rejected in favour of the clean "session_start is first" guarantee.)
+- **Trigger probability 1.0.** The Guide is always triggered once at session
+  start. (Mirrors `direct_address`.)
+- **Premium left to implementation.** A greeting is cheap; a small premium is
+  appropriate. The value is a policy parameter (the premium function is a
+  policy parameter in event-system.spec.md), not fixed in the spec —
+  consistent with how `direct_address` etc. are handled.
+
+The amendments touch ui.spec.md (event-type table + a Session start
+subsection + a Gherkin scenario), event-system.spec.md (a clarifying sentence
+in Trigger probability + a flush scenario), and usage-and-deployment.spec.md
+(a bootstrap-sequence step + a Gherkin assertion). The constrained-agent
+spec's interaction input shape is unchanged — `session_start` appears in the
+event queue like any other event.

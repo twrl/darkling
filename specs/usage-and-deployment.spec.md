@@ -488,7 +488,8 @@ On page load, the frontend bootstraps the runtime:
 3. The retrieval/cache worker is started, connecting to the backend over HTTP, opening the IndexedDB cache, and fetching the table of contents, as defined in [Client-side retrieval and caching](#client-side-retrieval-and-caching).
 4. The Guide agent loop worker is started, connecting to the service bus.
 5. The UI is mounted on the main thread, producing events as the Visitor interacts.
-6. The Guide begins consuming events and responding, as defined by [Constrained agent](./constrained-agent.spec.md) and [Event system](./event-system.spec.md).
+6. The UI emits `session_start` (trigger probability 1.0), which flushes the event queue and triggers the Guide's first interaction, as defined by [User interface](./ui.spec.md#session-start). The Guide may greet the Visitor or decline to act (return FINISHED), as permitted by [Constrained agent](./constrained-agent.spec.md).
+7. The Guide begins consuming events and responding, as defined by [Constrained agent](./constrained-agent.spec.md) and [Event system](./event-system.spec.md).
 
 Policy and configuration values are resolved at startup, as defined by [Policy and configuration](./policy-and-configuration.spec.md#static-resolution). The backend's configuration (LLM provider, persistent store connection, pre-shared secrets, spend caps, rate limits, persistence policies) is resolved when the serverless function initialises, from the content repository's config file and the deployment environment, as defined in [Configuration](#configuration).
 
@@ -504,6 +505,8 @@ Feature: Bootstrap
     And the retrieval/cache worker must be started and fetch the ToC
     And the Guide agent loop worker must be started
     And the UI must be mounted on the main thread
+    And the UI must emit a session_start event with trigger probability 1.0
+    And the session_start event must flush the queue and trigger the Guide's first interaction
 ```
 
 ## Relationship to other specifications

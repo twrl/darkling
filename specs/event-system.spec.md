@@ -81,7 +81,7 @@ If an event is added while an interaction is in progress, the roll is deferred u
 
 Each event type has a trigger probability in the range [0.0, 1.0]:
 
-- an event type with probability 1.0 always triggers a flush when added — for example, a direct address from the User;
+- an event type with probability 1.0 always triggers a flush when added — for example, a direct address from the User, or the `session_start` event marking the Visitor's arrival, as defined by [User interface](./ui.spec.md#session-start);
 - an event type with probability 0.0 never triggers a flush when added — the event accumulates in the queue and may be flushed by a later event's roll;
 - an event type with probability between 0.0 and 1.0 triggers a flush with that probability — for example, a routine browsing event with a low probability.
 
@@ -106,6 +106,14 @@ Feature: Flush policy
     When a direct_address event with trigger probability 1.0 is added
     Then the queue must be flushed
     And all accumulated events must be included in the flush
+
+  Scenario: Session start triggers the Guide's first interaction
+    Given the frontend has completed bootstrap and the event queue is empty
+    When a session_start event with trigger probability 1.0 is added
+    Then the queue must be flushed
+    And the session_start event must be the sole event in the flush
+    And the flush must trigger the Guide's first interaction
+    Because the Visitor arriving at the Archive is Visitor activity, as defined by [User interface](./ui.spec.md#session-start)
 
   Scenario: Low-probability event does not flush
     Given the event queue is empty
