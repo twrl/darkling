@@ -11,6 +11,9 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import { SpriteAvatar, loadAgent, loadClippyAgent } from './avatar/sprite-avatar.js';
+import type { LoadedAgent } from './avatar/agent-types.js';
+
 /** The fixed avatar positions. */
 export const AVATAR_POSITIONS = ['left', 'center', 'right', 'aside'] as const;
 export type AvatarPosition = (typeof AVATAR_POSITIONS)[number];
@@ -19,15 +22,25 @@ export type AvatarPosition = (typeof AVATAR_POSITIONS)[number];
  * The Guide's avatar. Renders a figure on the overlay plane, with speech text
  * near it. The Visitor can drag the figure; on release it snaps to the nearest
  * fixed position.
+ *
+ * By default the avatar is Clippy: its sprite sheet and animation data are
+ * loaded from the `clippyjs` package. Set `agentUrl` and `spriteUrl` together
+ * to load a different agent from URLs instead.
  */
 @customElement('guide-avatar')
 export class GuideAvatar extends LitElement {
   @property({ type: String }) position: AvatarPosition = 'center';
   @property({ type: Boolean }) visible = true;
+  /** Agent config URL. When set with `spriteUrl`, loads that agent instead of Clippy. */
+  @property({ type: String }) agentUrl = '';
+  /** Sprite sheet URL. When set with `agentUrl`, loads that agent instead of Clippy. */
+  @property({ type: String }) spriteUrl = '';
+
   @state() private speech: string | null = null;
   @state() private dragging = false;
 
   private speechTimer: ReturnType<typeof setTimeout> | null = null;
+  private avatar: SpriteAvatar | null = null;
 
   static override styles = css`
     :host {
@@ -47,21 +60,8 @@ export class GuideAvatar extends LitElement {
     }
 
     .figure {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      background: radial-gradient(
-        circle at 35% 30%,
-        rgba(120, 160, 255, 0.6),
-        rgba(60, 80, 140, 0.4)
-      );
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 0 24px rgba(120, 160, 255, 0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
-      color: rgba(255, 255, 255, 0.6);
+      display: block;
+      image-rendering: pixelated;
     }
 
     .speech {
@@ -128,9 +128,31 @@ export class GuideAvatar extends LitElement {
         @pointerdown=${this.handlePointerDown}
       >
         ${this.speech ? html`<div class="speech">${this.speech}</div>` : nothing}
-        <div class="figure">◈</div>
+        <canvas class="figure"></canvas>
       </div>
     `;
+  }
+
+  override async firstUpdated(): Promise<void> {
+    const canvas = this.renderRoot.querySelector('canvas');
+    if (!canvas) return;
+    this.avatar = new SpriteAvatar(canvas);
+    try {
+      const agent: LoadedAgent =
+        this.agentUrl && this.spriteUrl
+          ? await loadAgent(this.agentUrl, this.spriteUrl)
+          : await loadClippyAgent();
+      await this.avatar.load(agent);
+      this.dispatchEvent(new CustomEvent('avatar-ready'));
+    } catch (err) {
+      console.error('[guide-avatar] load failed:', err);
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.avatar?.stop();
+    if (this.speechTimer) clearTimeout(this.speechTimer);
   }
 
   /** Show speech text near the avatar. Clears after a timeout. */
@@ -152,11 +174,25 @@ export class GuideAvatar extends LitElement {
   /** Show or hide the avatar. */
   setVisibility(visible: boolean): void {
     this.visible = visible;
+    if (!visible) this.avatar?.stop();
   }
 
-  /** Drive an animation (placeholder — CSS class-based for now). */
-  playAnimation(_animation: string, _params?: Record<string, unknown>): void {
-    // Placeholder: could add CSS animation classes based on the animation name.
+  /**
+   * Drive an animation on the avatar. Named animations come from the agent
+   * config's vocabulary (e.g. `gesture_wave`, `blink`, `idle`). The Guide
+   * may pass any name the config defines; unknown names are a no-op.
+   */
+  playAnimation(animation: string, _params?: Record<string, unknown>): void {
+    this.avatar?.play(animation);
+  }
+
+  /**
+   * Request the current animation to exit at the next frame that defines an
+   * `exitBranch`, driving its exit sequence. Mirrors clippyjs'
+   * `Animator.exitAnimation()`. No-op if no animation is running.
+   */
+  exitAnimation(): void {
+    this.avatar?.exitAnimation();
   }
 
   private handlePointerDown = (e: PointerEvent) => {

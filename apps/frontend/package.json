@@ -18,6 +18,7 @@
     "@darkling/knowledge-base": "workspace:*",
     "@darkling/service-bus": "workspace:*",
     "@darkling/state-manager": "workspace:*",
+    "clippyjs": "^0.1.0",
     "immer": "^10.1.7",
     "lit": "^3.3.3",
     "signal-polyfill": "^0.2.2",
