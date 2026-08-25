@@ -88,8 +88,20 @@ export function createBusSnapshotFetcher(
  * ```
  */
 export class StateManagerHost extends LitElement {
-  /** Options for the local copy. Set before the element connects. */
-  options?: StateManagerHostOptions;
+  /**
+   * Options for the local copy. A reactive property: may be set before the
+   * element connects to the DOM or after; setting it while connected restarts
+   * the local copy (via the `updated()` handler).
+   */
+  // Declared as a reactive property imperatively (no decorator) so the element
+  // works with both standard and experimental decorator configurations. The
+  // `declare` modifier gives a type without emitting a class field that would
+  // shadow Lit's change-detecting accessor.
+  static override properties = {
+    options: { type: Object },
+  };
+
+  declare options: StateManagerHostOptions | undefined;
 
   /** The `LocalCopy` provided to descendants via context. */
   get localCopy(): LocalCopy | undefined {

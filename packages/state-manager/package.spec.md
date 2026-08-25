@@ -74,7 +74,7 @@ The package is consumed via the main subpath (`@darkling/state-manager`) and the
 
 Lit, `@lit/context`, and `@lit-labs/signals` are optional peer dependencies of the package. The Lit subpath is imported only in projects that use Lit; it does not affect consumers of the main or service subpaths.
 
-- `StateManagerHost` — a `<state-manager-host>` custom element that owns a `LocalCopy`, consumes the `ServiceClient` from the nearest ancestor `<service-bus-host>` (provided by `@darkling/service-bus/lit`), builds a `SnapshotFetcher` from it, creates a `PatchChannel`, fetches the initial snapshots on connect, and provides the `LocalCopy` to descendant elements via Lit's context mechanism. Disposed on disconnect.
+- `StateManagerHost` — a `<state-manager-host>` custom element that owns a `LocalCopy`, consumes the `ServiceClient` from the nearest ancestor `<service-bus-host>` (provided by `@darkling/service-bus/lit`), builds a `SnapshotFetcher` from it, creates a `PatchChannel`, fetches the initial snapshots on connect, and provides the `LocalCopy` to descendant elements via Lit's context mechanism. Disposed on disconnect. The `options` property is a reactive Lit property (set before or after connect; setting it while connected restarts the local copy), declared imperatively via `static properties` (no decorator, for decorator-config compatibility).
 - `StateManagerHostOptions` — the options for the host element: the slices to consume and the `BroadcastChannel` name.
 - `createBusSnapshotFetcher(client, declaration?)` — build a `SnapshotFetcher` from a `ServiceClient` by creating a typed proxy to the authority service. Exported for use outside a `<state-manager-host>` (e.g. in a worker).
 - `stateClientContext` — the Lit context key for the `LocalCopy`.
