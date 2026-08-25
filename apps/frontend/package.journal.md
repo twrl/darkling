@@ -123,3 +123,18 @@ triggers the Guide's first interaction. Implementation wiring (adding
 `session_start` to `event-types.ts`, emitting it from the bootstrap path, and
 gating Visitor-input production until it is emitted) is a follow-up against the
 now-established spec; not yet implemented.
+
+## session_start: implementation
+
+Implemented the session_start wiring against the established spec
+(ui.spec.md#session-start). `event-types.ts` adds `session_start` to the
+EventType union, the payload union (empty), the Zod enum, and a `sessionStart()`
+factory with an empty payload. `event-queue.ts` sets its default trigger
+probability to 1.0. `darkling-app.ts` emits `session_start` in `firstUpdated`
+(after the first render, when the UI is mounted) and gates all Visitor-activity
+event handlers (open/close/attention/traverse/address/avatar-reposition) on a
+`sessionStarted` flag so they no-op until session_start has been emitted —
+guaranteeing session_start is the sole event in the first flush, per the spec's
+"emitted before the UI accepts Visitor input" requirement. Added
+`test/session-start.test.ts` (5 tests) covering the factory, schema validation,
+and the trigger-probability default.

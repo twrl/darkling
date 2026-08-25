@@ -20,6 +20,7 @@ export const DEFAULT_TRIGGER_PROBABILITIES: TriggerProbabilities = {
   direct_address: 1.0,
   scroll: 0.05,
   avatar_repositioned: 0.0,
+  session_start: 1.0,
 };
 
 /** A randomness source for the flush roll. */

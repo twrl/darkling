@@ -23,7 +23,8 @@ export type EventType =
   | 'relationship_traversed'
   | 'direct_address'
   | 'scroll'
-  | 'avatar_repositioned';
+  | 'avatar_repositioned'
+  | 'session_start';
 
 /** The payload union, keyed by event type. */
 export type EventPayload =
@@ -33,7 +34,8 @@ export type EventPayload =
   | { source: string; relationship: string; target: string }
   | { text: string }
   | { document: string; blocks: string[] }
-  | { position: string };
+  | { position: string }
+  | Record<string, never>; // session_start: empty payload
 
 /** Zod schema for a UI event. */
 export const eventSchema = z.object({
@@ -45,6 +47,7 @@ export const eventSchema = z.object({
     'direct_address',
     'scroll',
     'avatar_repositioned',
+    'session_start',
   ]),
   timestamp: z.number(),
   payload: z.record(z.string(), z.unknown()),
@@ -86,4 +89,14 @@ export function scrollEvent(document: string, blocks: string[]): UIEvent {
 
 export function avatarRepositioned(position: string): UIEvent {
   return { type: 'avatar_repositioned', timestamp: Date.now(), payload: { position } };
+}
+
+/**
+ * The `session_start` event: marks the Visitor's arrival at the Archive,
+ * emitted once when bootstrap is complete and the frontend is ready, before
+ * any Visitor-activity event. Empty payload, as defined by
+ * [User interface](../../specs/ui.spec.md#session-start).
+ */
+export function sessionStart(): UIEvent {
+  return { type: 'session_start', timestamp: Date.now(), payload: {} };
 }

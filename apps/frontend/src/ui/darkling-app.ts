@@ -14,6 +14,7 @@ import { type ServiceBusHostOptions } from '@darkling/service-bus/lit';
 import { type StateManagerHostOptions, consumeState } from '@darkling/state-manager/lit';
 
 import { EventQueue } from '../events/event-queue.js';
+import { sessionStart } from '../events/event-types.js';
 import type { UIEvent } from '../events/event-types.js';
 
 import type { DocumentData, BlockData } from './document-tablet.js';
@@ -51,6 +52,8 @@ export class DarklingApp extends SignalWatcher(LitElement) {
   @state() private tocMinimised = false;
   @state() private searchMinimised = false;
   @state() private attentionBlock: string | null = null;
+  /** Whether session_start has been emitted; Visitor events are ignored until it is. */
+  @state() private sessionStarted = false;
 
   // Document content cache (fetched from the backend).
   private documents = new Map<string, DocumentData>();
@@ -75,6 +78,18 @@ export class DarklingApp extends SignalWatcher(LitElement) {
     });
     // Fetch the ToC from the backend.
     void this.fetchToc();
+  }
+
+  /**
+   * After the UI is first mounted, emit `session_start` (trigger probability
+   * 1.0), which flushes the queue and triggers the Guide's first interaction,
+   * as defined by [User interface](../../specs/ui.spec.md#session-start). Until
+   * this fires, Visitor-activity events are ignored so session_start is the
+   * sole event in the first flush.
+   */
+  override firstUpdated(): void {
+    this.sessionStarted = true;
+    this.eventQueue?.add(sessionStart());
   }
 
   private async fetchToc(): Promise<void> {
@@ -185,7 +200,13 @@ export class DarklingApp extends SignalWatcher(LitElement) {
 
   // --- Event handlers ---
 
+  /** Ignore Visitor-activity events until session_start has been emitted. */
+  private ready(): boolean {
+    return this.sessionStarted;
+  }
+
   private handleOpenDocument(documentId: string): void {
+    if (!this.ready()) return;
     void this.loadDocument(documentId);
     this.eventQueue?.add({
       type: 'document_opened',
@@ -195,6 +216,7 @@ export class DarklingApp extends SignalWatcher(LitElement) {
   }
 
   private handleClose(documentId: string): void {
+    if (!this.ready()) return;
     this.eventQueue?.add({
       type: 'document_closed',
       timestamp: Date.now(),
@@ -203,6 +225,7 @@ export class DarklingApp extends SignalWatcher(LitElement) {
   }
 
   private handleAttention(detail: { document: string; block: string }): void {
+    if (!this.ready()) return;
     this.eventQueue?.add({
       type: 'attention_drawn',
       timestamp: Date.now(),
@@ -211,6 +234,7 @@ export class DarklingApp extends SignalWatcher(LitElement) {
   }
 
   private handleTraverse(_detail: { link: string }): void {
+    if (!this.ready()) return;
     // Placeholder: resolve the link and open the target.
     // In a full implementation, this would call the retrieval service.
   }
@@ -226,6 +250,7 @@ export class DarklingApp extends SignalWatcher(LitElement) {
   }
 
   private handleAddress(text: string): void {
+    if (!this.ready()) return;
     this.eventQueue?.add({
       type: 'direct_address',
       timestamp: Date.now(),
@@ -234,6 +259,7 @@ export class DarklingApp extends SignalWatcher(LitElement) {
   }
 
   private handleAvatarReposition(detail: { position: string }): void {
+    if (!this.ready()) return;
     this.eventQueue?.add({
       type: 'avatar_repositioned',
       timestamp: Date.now(),
