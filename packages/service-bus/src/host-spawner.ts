@@ -26,6 +26,12 @@ export interface HostLaunchRequest {
   serviceId: ServiceId;
   /** The module specifier from which the declaration and implementation can be loaded. */
   moduleSpecifier: ModuleSpecifier;
+  /**
+   * Optional serialisable construction options for the service, forwarded to
+   * the host worker and merged into the `HostContext` under a key matching
+   * the service ID. Must be structured-cloneable.
+   */
+  options?: Record<string, unknown>;
 }
 
 /**

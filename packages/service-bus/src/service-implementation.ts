@@ -26,6 +26,15 @@ export interface HostContext {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serviceClient: any;
+  /**
+   * Per-service construction options, keyed by service ID. The host worker
+   * merges the serialisable `options` from each service's registration into
+   * this bag, so a service implementation reads its options at construction
+   * time (e.g. `hostContext.guide`). Values are structured-cloneable data
+   * only; non-serialisable objects (providers, registries) must be built by
+   * the worker from this config.
+   */
+  readonly options?: Record<string, unknown>;
 }
 
 /**

@@ -10,7 +10,12 @@ import {
   ValidationError,
   type ServiceModuleResolver,
 } from '../src/index.js';
-import { calculatorDeclaration, failingDeclaration, createTestHostContext } from './fixtures.js';
+import {
+  calculatorDeclaration,
+  failingDeclaration,
+  optionsCapturingDeclaration,
+  createTestHostContext,
+} from './fixtures.js';
 
 /**
  * A resolver that maps the test service IDs to their live declarations and
@@ -23,6 +28,8 @@ const testResolver: ServiceModuleResolver = (serviceId) => {
       return calculatorDeclaration;
     case 'failing':
       return failingDeclaration;
+    case 'options-capturing':
+      return optionsCapturingDeclaration;
     default:
       return undefined;
   }
@@ -158,6 +165,31 @@ describe('service bus integration', () => {
       await expect(
         client.call('failing', 'boom', {}, failingDeclaration.functions.boom),
       ).rejects.toThrow();
+    } finally {
+      dispose();
+    }
+  });
+
+  it('threads registration options through to the implementation HostContext', async () => {
+    const { broker, client, dispose } = setupBroker();
+    // The registration's `options` is the service's own options object; the
+    // broker/spawner keys it by service ID when merging into HostContext.options.
+    broker.register({
+      id: 'options-capturing',
+      moduleSpecifier: 'test://options-capturing',
+      options: { endpoint: '/x', n: 7 },
+    });
+
+    try {
+      const result = await client.call(
+        'options-capturing',
+        'getOptions',
+        {},
+        optionsCapturingDeclaration.functions.getOptions,
+      );
+      expect(result).toEqual({
+        options: { 'options-capturing': { endpoint: '/x', n: 7 } },
+      });
     } finally {
       dispose();
     }

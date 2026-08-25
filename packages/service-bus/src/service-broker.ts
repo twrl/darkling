@@ -204,7 +204,11 @@ export class ServiceBroker {
 
     const hostId = `host-${++this.hostCounter}`;
     const launchRequests: HostLaunchRequest[] = [
-      { serviceId: registration.id, moduleSpecifier: registration.moduleSpecifier },
+      {
+        serviceId: registration.id,
+        moduleSpecifier: registration.moduleSpecifier,
+        options: registration.options,
+      },
     ];
     const launched = await this.spawner.launch(launchRequests);
 
@@ -281,7 +285,15 @@ export class InProcessHostSpawner implements HostSpawner {
 
   async launch(services: HostLaunchRequest[]): Promise<LaunchedHost> {
     const { a, b } = createInProcessTransportPair();
-    const host = new ServiceHost(b, this.hostContext);
+    // Merge each service's serialisable options into the host context, keyed
+    // by service ID — mirroring the worker host worker's options threading, so
+    // in-process services read options from the same `hostContext.options` bag.
+    const mergedOptions: Record<string, unknown> = { ...this.hostContext.options };
+    for (const { serviceId, options } of services) {
+      if (options !== undefined) mergedOptions[serviceId] = options;
+    }
+    const hostContext: HostContext = { ...this.hostContext, options: mergedOptions };
+    const host = new ServiceHost(b, hostContext);
     const serviceIds: string[] = [];
     for (const { serviceId, moduleSpecifier } of services) {
       const declaration = this.resolver(serviceId, moduleSpecifier);

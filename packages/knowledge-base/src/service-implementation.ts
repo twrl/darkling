@@ -64,12 +64,14 @@ export class KnowledgeBaseService extends ServiceImplementation<KnowledgeBaseDec
 
   constructor(hostContext: HostContext) {
     super(hostContext);
+    // Options may be provided via the worker-protocol `options` bag (keyed
+    // by service ID — the production worker path) or as a top-level
+    // `hostContext.knowledgeBase` (the in-process test path).
     const options =
-      (
-        hostContext as HostContext & {
-          knowledgeBase?: KnowledgeBaseServiceOptions;
-        }
-      ).knowledgeBase ?? {};
+      (hostContext.options?.knowledgeBase as KnowledgeBaseServiceOptions | undefined) ??
+      (hostContext as HostContext & { knowledgeBase?: KnowledgeBaseServiceOptions })
+        .knowledgeBase ??
+      {};
     const stores = options.stores
       ? typeof options.stores === 'function'
         ? options.stores()

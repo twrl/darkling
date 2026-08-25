@@ -31,7 +31,15 @@ export interface ServiceRegistration {
   /** The module specifier from which the declaration and implementation can be loaded. */
   moduleSpecifier: ModuleSpecifier;
   /** Service-level metadata used by the broker for routing and activation. */
-  metadata?: ServiceMetadata;
+  metadata?: ServiceMetadata; /**
+   * Optional serialisable construction options for the service. These cross
+   * `postMessage` to the host worker and are merged into the `HostContext`
+   * under a key matching the service ID, so the service implementation can
+   * read them at construction time. Must be structured-cloneable; non-
+   * serialisable values (functions, live Zod schemas) must not be placed
+   * here — the worker builds those from this config.
+   */
+  options?: Record<string, unknown>;
 }
 
 /**

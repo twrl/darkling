@@ -81,6 +81,45 @@ export const failingDeclaration = {
 
 export type FailingDeclaration = typeof failingDeclaration;
 
+/**
+ * A service implementation that captures the `options` it was constructed
+ * with, for testing the worker-protocol options threading through the broker
+ * and in-process spawner.
+ */
+class OptionsCapturingImplementation extends ServiceImplementation {
+  readonly receivedOptions: unknown;
+  constructor(hostContext: HostContext) {
+    super(hostContext);
+    this.receivedOptions = hostContext.options;
+  }
+  async invoke(
+    _functionName: string,
+    _params: unknown,
+    _context: ServiceCallContext,
+  ): Promise<unknown> {
+    return { options: this.receivedOptions };
+  }
+}
+
+export const optionsCapturingImplementation = OptionsCapturingImplementation;
+
+/**
+ * A service declaration whose implementation captures its host context
+ * options, returning them from any function call.
+ */
+export const optionsCapturingDeclaration = {
+  id: 'options-capturing',
+  functions: {
+    getOptions: {
+      params: z.object({}),
+      returns: z.object({ options: z.unknown() }),
+    },
+  },
+  implementationLoader: () => Promise.resolve(optionsCapturingImplementation),
+} as const satisfies ServiceDeclaration;
+
+export type OptionsCapturingDeclaration = typeof optionsCapturingDeclaration;
+
 /** A minimal `HostContext` for testing, with a no-op service client. */
 export function createTestHostContext(): HostContext {
   return { serviceClient: {} };

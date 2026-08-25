@@ -2,6 +2,21 @@
 
 This journal records the development of the `@darkling/service-bus` package — the implementation of [service-bus.spec.md](../../specs/service-bus.spec.md) as defined by [package.spec.md](./package.spec.md). It is non-normative; the specifications take precedence.
 
+## Worker-protocol extension: serialisable per-service construction options
+
+Established through dialogue with the user while wiring the Guide's frontend services. The Guide service (`@darkling/guide`'s `GuideService`) reads `GuideServiceOptions` (LLM provider, tool registry, budget policy) from its `HostContext` at construction time, but the worker protocol previously carried only `{ serviceId, moduleSpecifier }` on `ServiceRegistration`/`HostLaunchRequest`/`HostWorkerInit`, and `HostContext` exposed only `serviceClient`. There was no path for the main thread to hand construction config to a worker-hosted service.
+
+The user chose to extend the worker protocol rather than add a frontend-specific guide worker. The extension:
+
+- **`ServiceRegistration.options?: Record<string, unknown>`** — an optional structured-cloneable construction-options bag for the service (the service's own options, not keyed by service ID), set by the main thread. The broker forwards it onto the `HostLaunchRequest`.
+- **`HostLaunchRequest.options?`** — forwarded by the broker's `ensureHostForService` from the registration.
+- **`HostWorkerInit.services[i].options?`** — the host worker (and the in-process `InProcessHostSpawner`) keys each service's options by service ID and merges them into `HostContext.options`: `options[serviceId] = serviceOptions`.
+- **`HostContext.options?: Record<string, unknown>`** — a new index-signature bag keyed by service ID. A service implementation reads its options at construction time (e.g. `hostContext.options?.guide`); `GuideService` and `KnowledgeBaseService` now read from `hostContext.options?.<serviceId>` with a fallback to the previous top-level `hostContext.<serviceId>` form, so in-process tests that set `hostContext.guide`/`hostContext.knowledgeBase` directly still work.
+
+The values must be structured-cloneable (numbers, strings, plain objects/arrays); non-serialisable objects (functions, live Zod schemas, `ToolRegistry`/`LlmProvider` instances) must not be placed here. The Guide worker constructs its `HttpLlmProvider`, `ToolRegistry`, and `BudgetTracker` from this serialisable config inside the worker — that construction lives in the frontend (a frontend guide service implementation), not in `@darkling/guide`, which keeps `GuideService` provider/registry-agnostic as its package spec requires.
+
+The root spec ([Service bus — Declaration module and implementation loading](../../specs/service-bus.spec.md#declaration-module-and-implementation-loading)) says the host "instantiates the constructor with a `HostContext`, injecting bus access at construction time" and does not constrain what else `HostContext` may carry, so this extension conforms; it does not modify the root spec.
+
 ## Origin
 
 Created as the first implementation package, in response to a request to "make a start on implementation." The service bus was chosen as the starting point because it is infrastructure that the constrained agent, retrieval, and event system all depend on, and it can be implemented and tested independently of the content model.
@@ -260,3 +275,13 @@ consola's default reporter. The logger tags are the closed set
 `@darkling/observability`'s `LOG_TAGS`. See
 `packages/observability/package.journal.md` for the cross-cutting decision and
 the deferred spec-authority question.
+
+## `ServiceBusHost.options` is now a reactive property
+
+The `ServiceBusHost.options` field was previously a plain (non-reactive) field documented as "set this before the element connects to the DOM." When the frontend moved the `<service-bus-host>` out of `<darkling-app>`'s render and into `index.html` (so it could be an ancestor provider for Lit context), `main.ts` set `options` imperatively *after* the element connected — but a plain field set post-connect never triggers `updated()`, so `_startBus()` ran once in `connectedCallback` with `options === undefined` (returning early) and the broker never started.
+
+Fix: `options` is now a reactive Lit property, declared imperatively via `static properties = { options: { type: Object } }` (no decorator, preserving the element's "works with both standard and experimental decorator configurations" convention). Setting it after connection triggers `updated()` → `_restartBus()`, so the bus starts once configured. The `updated()` restart-on-change handler (already present) now actually fires. The same change was applied to `StateManagerHost.options`.
+
+**Follow-up (class-field shadowing):** the first attempt kept `options?: ServiceBusHostOptions;` as a class field alongside `static properties`, which threw Lit's class-field-shadowing error ("will not trigger updates as expected because they are set using class fields"). A class field initializer overwrites Lit's change-detecting accessor. The field is therefore declared with `declare options: ServiceBusHostOptions | undefined;` (type-only, no emitted field), so Lit's accessor is used and updates fire. The same `declare` form applies to `StateManagerHost.options`.
+
+Recorded because it changes the documented usage contract ("set before connect" → "set before or after connect").

@@ -29,7 +29,7 @@ This specification defines the package that implements those requirements. The p
 
 [Service bus](../../specs/service-bus.spec.md) requires the broker and each host to run in separate Web Workers, with the `ServiceClient` on the caller's thread. The package's registration model is designed to support this topology:
 
-- **Registrations are serializable.** A `ServiceRegistration` record (service ID + module specifier + metadata) contains only structured-cloneable fields. The main thread can register services with the broker worker via `postMessage` without loss.
+- **Registrations are serializable.** A `ServiceRegistration` record (service ID + module specifier + metadata + optional structured-cloneable construction `options`) contains only structured-cloneable fields. The main thread can register services with the broker worker via `postMessage` without loss.
 - **Live declarations are not held by the broker.** A `ServiceDeclaration` carries live Zod schema objects, which are not structured-cloneable (they lose their methods across `postMessage`). The broker holds only serializable registration records; it delegates validation to the host, as permitted by the spec's "broker or host" wording.
 - **Hosts obtain live objects by importing the module.** The module specifier points to a module exporting the `ServiceDeclaration` (with live Zod schemas) and `ServiceImplementation`. Each host worker imports the module to obtain fresh, live instances. The module specifier is the serializable handle that crosses worker boundaries in place of the non-serializable objects.
 
@@ -101,7 +101,7 @@ The `ServiceHost` constructor takes a `Transport` and a `HostContext`. The `Host
 
 ### `ServiceImplementation`
 
-The package exports an abstract `ServiceImplementation` class and a `HostContext` interface. A service implementation is a class extending `ServiceImplementation`, providing an `invoke(functionName, params, context)` method that the host calls to dispatch function calls. The implementation receives a `HostContext` in its constructor, giving it access to the bus at construction time.
+The package exports an abstract `ServiceImplementation` class and a `HostContext` interface. A service implementation is a class extending `ServiceImplementation`, providing an `invoke(functionName, params, context)` method that the host calls to dispatch function calls. The implementation receives a `HostContext` in its constructor, giving it access to the bus at construction time and, optionally, to structured-cloneable construction `options` (keyed by service ID) forwarded from the service's registration across the worker boundary.
 
 The package also exports `ServiceCallContext` (the per-call context: service ID, function name, message ID), distinct from `HostContext` (the construction-time context).
 
@@ -195,7 +195,7 @@ The package provides an optional Lit integration via the `@darkling/service-bus/
 
 The subpath exports:
 
-- **`ServiceBusHost`** — a `<service-bus-host>` custom element that creates and owns a `ServiceBus` instance when it connects to the DOM, and disposes it when disconnected. The `ServiceBus` options are set via the `options` property. The element defaults to a worker-based broker, constructing the `BrokerFactory` from the provided `brokerWorkerUrl` and `hostWorkerUrl` via `createWorkerBrokerFactory`. For in-process testing, a `brokerFactory` can be provided directly, which takes precedence over the URL options. The element provides the `ServiceClient` to descendants via Lit's context mechanism using a `ContextProvider`. The element is defined imperatively (no TypeScript decorators) so it works with both standard and experimental decorator configurations.
+- **`ServiceBusHost`** — a `<service-bus-host>` custom element that creates and owns a `ServiceBus` instance when it connects to the DOM, and disposes it when disconnected. The `ServiceBus` options are set via the `options` property, which is a reactive Lit property: it may be set before the element connects to the DOM or after, and setting it while connected recreates the `ServiceBus`. The element defaults to a worker-based broker, constructing the `BrokerFactory` from the provided `brokerWorkerUrl` and `hostWorkerUrl` via `createWorkerBrokerFactory`. For in-process testing, a `brokerFactory` can be provided directly, which takes precedence over the URL options. The element provides the `ServiceClient` to descendants via Lit's context mechanism using a `ContextProvider`. The element is defined imperatively (no TypeScript decorators) so it works with both standard and experimental decorator configurations; the `options` reactive property is declared via the imperative `static properties` form.
 - **`ServiceBusHostOptions`** — the options interface for the host element: `brokerWorkerUrl` and `hostWorkerUrl` (for the default worker-based path), `brokerFactory` (optional, takes precedence), and `registrations` (optional).
 - **`serviceClientContext`** — the Lit `Context` key for the `ServiceClient`.
 - **`consumeServiceClient()`** — a property decorator that consumes the `ServiceClient` from the nearest ancestor `<service-bus-host>`. Requires decorator support in the consumer's TypeScript configuration.

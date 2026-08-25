@@ -44,7 +44,14 @@ self.addEventListener('message', async (event: MessageEvent) => {
     // The host's ServiceClient is wired back to the broker via the same
     // transport, enabling service-to-service calls.
     const serviceClient = new ServiceClient(transport);
-    const hostContext: HostContext = { serviceClient };
+    // Merge each service's serialisable construction options into the host
+    // context under its service ID, so the implementation can read them at
+    // construction time (e.g. `hostContext.options?.guide`).
+    const options: Record<string, unknown> = {};
+    for (const { serviceId, options: serviceOptions } of services) {
+      if (serviceOptions !== undefined) options[serviceId] = serviceOptions;
+    }
+    const hostContext: HostContext = { serviceClient, options };
 
     const host = new ServiceHost(transport, hostContext);
     const serviceIds: string[] = [];

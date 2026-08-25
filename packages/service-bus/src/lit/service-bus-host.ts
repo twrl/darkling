@@ -82,11 +82,19 @@ export interface ServiceBusHostOptions {
  */
 export class ServiceBusHost extends LitElement {
   /**
-   * The options for the `ServiceBus`. Set this before the element connects to
-   * the DOM. If the options change while connected, the `ServiceBus` is
-   * recreated.
+   * The options for the `ServiceBus`. A reactive property: may be set before
+   * the element connects to the DOM or after; setting it while connected
+   * recreates the `ServiceBus` (via the `updated()` handler).
    */
-  options?: ServiceBusHostOptions;
+  // Declared as a reactive property imperatively (no decorator) so the element
+  // works with both standard and experimental decorator configurations. The
+  // `declare` modifier gives a type without emitting a class field that would
+  // shadow Lit's change-detecting accessor.
+  static override properties = {
+    options: { type: Object },
+  };
+
+  declare options: ServiceBusHostOptions | undefined;
 
   /** The `ServiceClient` provided to descendants via context. */
   get serviceClient(): ServiceClient | undefined {
