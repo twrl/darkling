@@ -4,6 +4,9 @@ import type { ServiceDeclaration, ServiceInterface } from './declaration.js';
 import { deserialiseError, HostUnavailableError, ServiceBusError } from './errors.js';
 import type { Envelope, MessageId, ServiceId } from './envelope.js';
 import type { Transport } from './transport.js';
+import { createLogger } from '@darkling/observability';
+
+const log = createLogger('service-bus:client');
 
 /**
  * A handler registered for a pending call, awaiting a return or error message.
@@ -108,6 +111,7 @@ export class ServiceClient {
 
       const timer = setTimeout(() => {
         this.pending.delete(messageId);
+        log.warn('call timed out', { service: serviceId, function: functionName, messageId });
         reject(
           new HostUnavailableError(
             `Call to ${serviceId}.${functionName} timed out after ${this.callTimeoutMs}ms`,
@@ -150,8 +154,18 @@ export class ServiceClient {
     if (pending.timer) clearTimeout(pending.timer);
 
     if (envelope.head.type === 'return') {
+      log.debug('call returned', {
+        service: envelope.head.service,
+        function: envelope.head.function,
+        messageId: envelope.head.messageId,
+      });
       pending.resolve(envelope.body);
     } else {
+      log.debug('call rejected', {
+        service: envelope.head.service,
+        function: envelope.head.function,
+        messageId: envelope.head.messageId,
+      });
       pending.reject(deserialiseError(envelope.body));
     }
   }

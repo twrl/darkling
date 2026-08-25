@@ -133,3 +133,29 @@ The provider is for backend use only. The API key is passed to the constructor a
 - **Token usage and cost.** The provider does not surface `usage`/`cost` from the response. The backend's cost and abuse controls (per [Usage and deployment](../../specs/usage-and-deployment.spec.md#cost-and-abuse-controls)) will need token/cost data; a follow-up should expose it (e.g. via an extended `TurnOutput` or an out-of-band callback).
 - **Provider failure retry.** OpenRouter itself falls back across providers/GPUs on 5xx, but the provider does not retry on network errors. Retry policy is deferred to the backend.
 - **Model selection.** The model is a constructor option; selection policy (routing, fallbacks across models) is a backend configuration concern, not a provider concern.
+
+## Logging (observability)
+
+Wired diagnostic logging into the agent loop and the LLM providers via the new
+`@darkling/observability` package (consola-backed). Implementation concern: no
+spec governs logging; additive output only, no behavioural change. The user
+selected dev/diagnostic traces (out-of-band) and per-worker console as the
+sink; the spec-authority question (whether to formalise observability via the
+spec workflow) is deferred ("decide later").
+
+- `AgentLoop` logs (tag `guide:loop`): interaction start (event count, budget,
+  carryover, pressure, undispatched), per-turn LLM invocation (turn, tool count,
+  previous results, remaining budget), provider failures, FINISHED, budget
+  exhaustion before/after dispatch, per-turn dispatch summary (calls/ok/failed/
+  undispatched), and interaction end (reason, turns, consumed, new carryover/
+  pressure).
+- `HttpLlmProvider` and `OpenRouterLlmProvider` log (tag `guide:provider`):
+  request shape (endpoint/model/messages/tools), error responses (status), and
+  response shape (finished/toolCalls count).
+
+Logs are out-of-band and do not alter the constrained agent's "not directly
+observable" reasoning model — they are not surfaced to the model or the User.
+Full prompt/completion text is NOT logged (only request/response shape); this
+avoids leaking content into logs and keeps output concise. See
+`packages/observability/package.journal.md` for the cross-cutting decision and
+gaps (bus-aggregated / remote sinks; a possible future observability spec).

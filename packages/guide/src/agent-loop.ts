@@ -39,6 +39,9 @@ import { InteractionBudget } from './budget.js';
 import type { LlmProvider, TurnResultEntry } from './llm-provider.js';
 import type { ToolDispatchContext, ToolRegistry } from './tools.js';
 import { ToolRejectedError } from './tools.js';
+import { createLogger } from '@darkling/observability';
+
+const log = createLogger('guide:loop');
 
 /**
  * Options for the agent loop.
@@ -145,6 +148,14 @@ export class AgentLoop {
     const carryFromPrevious = this.undispatched;
     this.undispatched = [];
 
+    log.info('interaction started', {
+      events: events.length,
+      budget: budgetTotal,
+      carryover: this.budgetTracker.currentCarryover,
+      pressure: this.budgetTracker.currentPressure,
+      undispatched: carryFromPrevious.length,
+    });
+
     const input: InteractionInput = {
       eventQueue: events,
       status: {
@@ -176,19 +187,30 @@ export class AgentLoop {
 
       let output: TurnOutput;
       try {
+        log.debug('turn invoked', {
+          turn: turnCount,
+          toolCount: tools.length,
+          previousResults: previousResults?.length ?? 0,
+          remaining: budget.remaining,
+        });
         output = await this.provider.turn({
           input,
           tools,
           previousResults,
         });
-      } catch {
+      } catch (err) {
         // A provider failure ends the interaction; the response up to this
         // point stands, as required by [Exhaustion](../../specs/constrained-agent.spec.md#exhaustion).
+        log.warn('provider turn failed', {
+          turn: turnCount,
+          error: err instanceof Error ? err.message : String(err),
+        });
         break;
       }
 
       // FINISHED ends the interaction immediately, producing no effect.
       if (output.finished || output.toolCalls === null) {
+        log.info('interaction finished', { turn: turnCount });
         finished = true;
         break;
       }
@@ -196,6 +218,7 @@ export class AgentLoop {
       // Budget exhausted: no further tool calls are dispatched, and the
       // interaction ends, as defined by [Exhaustion](../../specs/constrained-agent.spec.md#exhaustion).
       if (budget.exhausted) {
+        log.info('budget exhausted before dispatch', { turn: turnCount });
         break;
       }
 
@@ -207,6 +230,13 @@ export class AgentLoop {
         budget,
         host,
       );
+      log.debug('turn dispatched', {
+        turn: turnCount,
+        calls: output.toolCalls.length,
+        ok: results.filter((r) => r.ok).length,
+        failed: results.filter((r) => !r.ok).length,
+        undispatched: turnUndispatched.length,
+      });
       this.pendingUndispatched.push(...turnUndispatched);
       previousResults = results.map(toResultEntry);
 
@@ -226,12 +256,21 @@ export class AgentLoop {
     const consumed = budget.consumedCost;
     this.budgetTracker.reportInteraction(budgetTotal, consumed);
 
-    return {
-      reason: finished ? 'finished' : 'budget-exhausted',
+    const outcome = {
+      reason: (finished ? 'finished' : 'budget-exhausted') as InteractionOutcome['reason'],
       consumed,
       undispatched: this.undispatched,
       workingMemory: this.workingMemory,
     };
+    log.info('interaction ended', {
+      reason: outcome.reason,
+      turns: turnCount,
+      consumed,
+      undispatched: this.undispatched.length,
+      newCarryover: this.budgetTracker.currentCarryover,
+      newPressure: this.budgetTracker.currentPressure,
+    });
+    return outcome;
   }
 
   /**

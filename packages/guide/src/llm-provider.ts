@@ -29,6 +29,9 @@ import type { z } from 'zod';
 
 import type { InteractionInput, ToolCall, TurnOutput } from './model.js';
 import type { ToolDeclaration } from './tools.js';
+import { createLogger } from '@darkling/observability';
+
+const log = createLogger('guide:provider');
 
 /**
  * The request sent to the LLM provider for a turn: the interaction input, the
@@ -148,15 +151,29 @@ export class HttpLlmProvider implements LlmProvider {
       tools: request.tools,
       previousResults: request.previousResults,
     };
+    log.debug('llm proxy request', {
+      endpoint: this.endpoint,
+      toolCount: request.tools.length,
+      previousResults: request.previousResults?.length ?? 0,
+    });
     const response = await this.fetchImpl(this.endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!response.ok) {
+      log.warn('llm proxy error response', {
+        endpoint: this.endpoint,
+        status: response.status,
+        statusText: response.statusText,
+      });
       throw new Error(`LLM proxy returned ${response.status}: ${response.statusText}`);
     }
     const data = (await response.json()) as HttpLlmResponseBody;
+    log.debug('llm proxy response', {
+      finished: data.finished,
+      toolCalls: data.toolCalls?.length ?? 0,
+    });
     if (data.finished) {
       return { toolCalls: null, finished: true };
     }

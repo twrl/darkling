@@ -15,11 +15,12 @@
     "format": "prettier --write \"**/*.ts\""
   },
   "dependencies": {
+    "@darkling/observability": "workspace:*",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "lit": "^3.0.0",
-    "@lit/context": "^1.0.0"
+    "@lit/context": "^1.0.0",
+    "lit": "^3.0.0"
   },
   "peerDependenciesMeta": {
     "lit": {

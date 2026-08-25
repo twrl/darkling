@@ -8,6 +8,9 @@ import { ServiceModuleRegistry } from './service-module-registry.js';
 import type { ServiceDeclaration } from './declaration.js';
 import type { HostContext } from './service-implementation.js';
 import { ServiceHost } from './service-host.js';
+import { createLogger } from '@darkling/observability';
+
+const log = createLogger('service-bus:broker');
 
 /**
  * A host tracked by the broker: its transport and the service IDs it has
@@ -82,6 +85,7 @@ export class ServiceBroker {
   /** Start the broker, listening for messages from the client transport. */
   start(): void {
     if (this.unsubscribe) return;
+    log.info('broker starting');
     this.unsubscribe = this.clientTransport.onMessage((envelope) => {
       void this.handleClientMessage(envelope);
     });
@@ -97,8 +101,10 @@ export class ServiceBroker {
       host.unsubscribe();
       host.transport.close();
     }
+    const hostCount = this.hosts.size;
     this.hosts.clear();
     this.serviceToHost.clear();
+    log.info('broker stopped', { hostsClosed: hostCount });
   }
 
   /**
@@ -126,6 +132,7 @@ export class ServiceBroker {
     const { service } = envelope.head;
     const entry = this.registry.get(service);
     if (!entry) {
+      log.warn('call to unregistered service', { service, messageId: envelope.head.messageId });
       this.sendErrorToClient(envelope, {
         name: 'ServiceNotRegisteredError',
         code: 'SERVICE_NOT_REGISTERED',
@@ -139,11 +146,13 @@ export class ServiceBroker {
     // existing host) before dispatching the call.
     let hostId = this.serviceToHost.get(service);
     if (!hostId) {
+      log.debug('launching host for service', { service });
       hostId = await this.ensureHostForService(service);
     }
 
     const host = this.hosts.get(hostId);
     if (!host) {
+      log.error('host unavailable after launch', { service, hostId });
       this.sendErrorToClient(envelope, {
         name: 'HostUnavailableError',
         code: 'HOST_UNAVAILABLE',
@@ -152,6 +161,12 @@ export class ServiceBroker {
       return;
     }
 
+    log.debug('routing call', {
+      service,
+      function: envelope.head.function,
+      messageId: envelope.head.messageId,
+      hostId,
+    });
     // The broker passes the envelope to the host. Transferable objects are
     // referenced in the head's transferables field, passed verbatim.
     host.transport.send(envelope);
@@ -204,6 +219,7 @@ export class ServiceBroker {
 
     this.hosts.set(hostId, host);
     this.serviceToHost.set(serviceId, hostId);
+    log.info('host launched', { serviceId, hostId });
     return hostId;
   }
 

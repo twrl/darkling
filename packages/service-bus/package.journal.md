@@ -239,3 +239,24 @@ The `ServiceBusHostOptions` in the Lit integration was updated accordingly: `spa
 The `ServiceBusHostOptions` was changed so that `brokerFactory` is optional, and the element defaults to a worker-based broker when `brokerWorkerUrl` and `hostWorkerUrl` are provided. The element constructs the `BrokerFactory` internally via `createWorkerBrokerFactory` from the URLs. This makes the worker path the default for browser use, which is the typical production deployment.
 
 For in-process testing, the consumer provides `brokerFactory` directly (e.g. via `createInProcessBrokerFactory`), which takes precedence over the URL options. When `brokerFactory` is provided, the element registers services via `bus.register()`; when the worker factory is used, registrations are sent in the `BrokerWorkerInit` message (the worker factory handles this).
+
+## Logging (observability)
+
+Wired diagnostic logging into the broker, host, and client via the new
+`@darkling/observability` package (consola-backed). This is an implementation
+concern: no spec governs logging, and the wiring is additive — it emits
+diagnostic output only, with no control-flow or behavioural change.
+
+- `ServiceBroker` logs: broker start/stop, call routing (service/function/
+  messageId/hostId), host launch, calls to unregistered services, and host
+  unavailability.
+- `ServiceHost` logs: service activation, host start, parameter-validation
+  failures, call success/failure, and per-call dispatch errors.
+- `ServiceClient` logs: call returns, call rejections, and call timeouts.
+
+All logs are out-of-band (operator/developer only); per-worker console sink via
+consola's default reporter. The logger tags are the closed set
+`service-bus:broker`/`service-bus:host`/`service-bus:client` in
+`@darkling/observability`'s `LOG_TAGS`. See
+`packages/observability/package.journal.md` for the cross-cutting decision and
+the deferred spec-authority question.

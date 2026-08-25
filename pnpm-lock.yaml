@@ -163,6 +163,9 @@ importers:
 
   packages/guide:
     dependencies:
+      '@darkling/observability':
+        specifier: workspace:*
+        version: link:../observability
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -205,8 +208,27 @@ importers:
         specifier: ^4.0.4
         version: 4.0.4
 
+  packages/observability:
+    dependencies:
+      consola:
+        specifier: ^3.4.2
+        version: 3.4.2
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@26.2.0)(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.12)
+
   packages/service-bus:
     dependencies:
+      '@darkling/observability':
+        specifier: workspace:*
+        version: link:../observability
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1026,6 +1048,10 @@ packages:
 
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
+
+  consola@3.4.2:
+    resolution: {integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==}
+    engines: {node: ^14.18.0 || >=16.10.0}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2927,6 +2953,8 @@ snapshots:
   color-name@1.1.4: {}
 
   concat-map@0.0.1: {}
+
+  consola@3.4.2: {}
 
   cross-spawn@7.0.6:
     dependencies:

@@ -4,6 +4,9 @@ import type { Envelope } from './envelope.js';
 import type { Transport } from './transport.js';
 import type { ServiceCallContext } from './service-call-context.js';
 import type { HostContext, ServiceImplementation } from './service-implementation.js';
+import { createLogger } from '@darkling/observability';
+
+const log = createLogger('service-bus:host');
 
 /**
  * A `ServiceHost` receives messages from the broker, dispatches them to the
@@ -47,11 +50,13 @@ export class ServiceHost {
     const implementation = new implementationClass(this.hostContext);
     this.declarations.set(declaration.id, declaration);
     this.implementations.set(declaration.id, implementation);
+    log.info('service activated', { serviceId: declaration.id });
   }
 
   /** Start listening for messages from the broker. */
   start(): void {
     if (this.unsubscribe) return;
+    log.debug('host starting', { services: [...this.declarations.keys()] });
     this.unsubscribe = this.transport.onMessage((envelope) => {
       void this.handleCall(envelope);
     });
@@ -101,6 +106,7 @@ export class ServiceHost {
     // schema before dispatching the call.
     const paramResult = fnDecl.params.safeParse(envelope.body);
     if (!paramResult.success) {
+      log.warn('parameter validation failed', { service, function: functionName, messageId });
       this.sendError(messageId, service, functionName, {
         name: 'ValidationError',
         code: 'VALIDATION_ERROR',
@@ -135,8 +141,15 @@ export class ServiceHost {
         );
       }
 
+      log.debug('call succeeded', { service, function: functionName, messageId });
       this.sendReturn(messageId, service, functionName, returnResult.data, transferables);
     } catch (error) {
+      log.warn('call failed', {
+        service,
+        function: functionName,
+        messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.sendError(
         messageId,
         service,

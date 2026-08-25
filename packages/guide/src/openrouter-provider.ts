@@ -38,6 +38,9 @@ import { toJSONSchema } from 'zod';
 import type { InteractionInput, ToolCall, TurnOutput } from './model.js';
 import type { LlmProvider, LlmTurnRequest, TurnResultEntry } from './llm-provider.js';
 import type { ToolDeclaration } from './tools.js';
+import { createLogger } from '@darkling/observability';
+
+const log = createLogger('guide:provider');
 
 /**
  * Options for the {@link OpenRouterLlmProvider}.
@@ -164,6 +167,11 @@ export class OpenRouterLlmProvider implements LlmProvider {
 
   async turn(request: LlmTurnRequest): Promise<TurnOutput> {
     const body = this.buildRequestBody(request);
+    log.debug('openrouter request', {
+      model: this.model,
+      messages: body.messages.length,
+      tools: body.tools?.length ?? 0,
+    });
     const response = await this.fetchImpl(this.endpoint, {
       method: 'POST',
       headers: this.headers(),
@@ -171,12 +179,22 @@ export class OpenRouterLlmProvider implements LlmProvider {
     });
     if (!response.ok) {
       const text = await response.text().catch(() => '');
+      log.warn('openrouter error response', {
+        status: response.status,
+        statusText: response.statusText,
+        model: this.model,
+      });
       throw new Error(
         `OpenRouter returned ${response.status}: ${response.statusText}${text ? ` — ${text}` : ''}`,
       );
     }
     const data = (await response.json()) as OpenRouterResponse;
-    return this.parseResponse(data);
+    const output = this.parseResponse(data);
+    log.debug('openrouter response', {
+      finished: output.finished,
+      toolCalls: output.toolCalls?.length ?? 0,
+    });
+    return output;
   }
 
   /** Build the OpenRouter chat completions request body for a turn. */
