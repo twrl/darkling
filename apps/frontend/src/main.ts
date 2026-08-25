@@ -19,10 +19,13 @@ import '@darkling/state-manager/lit';
 import type { ServiceBusHostOptions } from '@darkling/service-bus/lit';
 import type { StateManagerHostOptions } from '@darkling/state-manager/lit';
 
-// The app is mounted in index.html as <darkling-app>.
-// Configure the bus and state manager options via the element's properties.
-const app = document.querySelector('darkling-app');
-if (app) {
+// The hosts are mounted in index.html wrapping <darkling-app> so that the app
+// and the UI components consume the ServiceClient and the shared-state
+// LocalCopy from ancestor providers (Lit context flows downward). Configure
+// the hosts' options via their properties.
+const busHost = document.querySelector('service-bus-host');
+const stateHost = document.querySelector('state-manager-host');
+if (busHost && stateHost) {
   const brokerWorkerUrl = new URL('./workers/broker-worker.ts', import.meta.url).href;
   const hostWorkerUrl = new URL('./workers/host-worker.ts', import.meta.url).href;
 
@@ -41,7 +44,17 @@ if (app) {
     brokerWorkerUrl,
     hostWorkerUrl,
     registrations: [
-      { id: 'guide', moduleSpecifier: guideDeclarationUrl },
+      {
+        id: 'guide',
+        moduleSpecifier: guideDeclarationUrl,
+        // Serialisable construction config for the Guide worker. The worker
+        // builds the HttpLlmProvider, ToolRegistry, and BudgetTracker from
+        // these (see workers/guide-service.ts). The LLM proxy endpoint is the
+        // backend's /llm/turn; the Service Worker attaches the bearer token.
+        // The service-bus host worker keys these under the service ID, so the
+        // Guide service reads them from hostContext.options.guide.
+        options: { llmEndpoint: '/llm/turn' },
+      },
       { id: 'knowledge-base', moduleSpecifier: retrievalDeclarationUrl },
       { id: 'state-manager', moduleSpecifier: stateManagerDeclarationUrl },
     ],
@@ -54,8 +67,8 @@ if (app) {
 
   // Set the options as reactive properties (not attributes) so Lit receives
   // the typed objects, not JSON strings.
-  (app as unknown as { busOptions: ServiceBusHostOptions }).busOptions = busOptions;
-  (app as unknown as { stateOptions: StateManagerHostOptions }).stateOptions = stateOptions;
+  (busHost as unknown as { options: ServiceBusHostOptions }).options = busOptions;
+  (stateHost as unknown as { options: StateManagerHostOptions }).options = stateOptions;
 }
 
 // Register the Service Worker for transparent token handling, as defined by

@@ -9,6 +9,16 @@
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
-    <darkling-app></darkling-app>
+    <!--
+      The service-bus and state-manager hosts wrap <darkling-app> so the app
+      and the UI components consume the ServiceClient and the shared-state
+      LocalCopy from ancestor providers (Lit context flows downward). The
+      hosts' options are set imperatively by main.ts.
+    -->
+    <service-bus-host>
+      <state-manager-host>
+        <darkling-app></darkling-app>
+      </state-manager-host>
+    </service-bus-host>
   </body>
 </html>

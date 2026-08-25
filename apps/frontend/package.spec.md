@@ -38,8 +38,11 @@ The app is organised into the following modules:
 
 - `src/index.ts` — the app entry: bootstrap the bus, register services, mount the UI.
 - `src/workers/broker-worker.ts` — the service bus broker worker entry point.
-- `src/workers/guide-worker.ts` — the Guide agent loop host worker entry point.
-- `src/workers/retrieval-worker.ts` — the retrieval/cache host worker entry point.
+- `src/workers/host-worker.ts` — the generic service-bus host worker entry point (shared by all worker-hosted services).
+- `src/workers/guide-declaration.ts` — the frontend Guide service declaration, whose `implementationLoader` dynamically imports `./guide-service.ts`. The wire contract mirrors `@darkling/guide`'s `runInteraction` schemas.
+- `src/workers/guide-service.ts` — the frontend Guide service implementation (`FrontendGuideService`): constructs the loop's `HttpLlmProvider`, `ToolRegistry` (agent-self tools), and `BudgetTracker` from serialisable config carried across the worker boundary via the service registration's `options` bag, then delegates to `@darkling/guide`'s `GuideService`.
+- `src/workers/retrieval-declaration.ts` — re-exports the knowledge-base retrieval service declaration.
+- `src/workers/state-manager-declaration.ts` — re-exports the state-manager service declaration.
 - `src/events/event-queue.ts` — the event queue and per-event probabilistic flush policy, as defined by [Event system](../../specs/event-system.spec.md).
 - `src/events/event-types.ts` — the high-level semantic event types and payloads, as defined by [User interface](../../specs/ui.spec.md#events).
 - `src/tools/ui-control-tools.ts` — the `navigate` and `draw_attention` tools, as defined by [User interface](../../specs/ui.spec.md#ui-control-tools).
