@@ -1,0 +1,22 @@
+{
+  "$schema": "./darkling.schema.json",
+  "version": 1,
+  "description": "Content-specific configuration, versioned with the source Markdown. This is the development/test stand-in for the configuration file that lives in the root of the content repository, as defined by https://darkling.example/specs/usage-and-deployment.spec.md#content-specific-configuration. Operational configuration (LLM key, persistent store, spend caps, secrets) lives in the deployment environment, not here.",
+
+  "relationships": {
+    "types": ["references", "describes", "contrasts-with", "derived-from", "related-to"]
+  },
+
+  "retrieval": {
+    "properties": {
+      "document": {
+        "slug": { "match": "exact" },
+        "title": { "match": "substring" }
+      },
+      "block": {
+        "title": { "match": "substring" },
+        "document": { "match": "exact" }
+      }
+    }
+  }
+}
