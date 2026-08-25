@@ -55,9 +55,18 @@ export class GuideService extends ServiceImplementation<GuideServiceDeclaration>
 
   constructor(hostContext: HostContext) {
     super(hostContext);
-    const options = (hostContext as HostContext & { guide?: GuideServiceOptions }).guide;
+    // Options may be provided either via the worker-protocol `options` bag
+    // (keyed by service ID — the production worker path) or as a top-level
+    // `hostContext.guide` (the in-process test path). The worker path
+    // constructs the provider/registry/policy from serialisable config inside
+    // the worker; see the frontend guide service for that construction.
+    const options =
+      (hostContext.options?.guide as GuideServiceOptions | undefined) ??
+      (hostContext as HostContext & { guide?: GuideServiceOptions }).guide;
     if (!options) {
-      throw new Error('GuideService requires a GuideServiceOptions under hostContext.guide');
+      throw new Error(
+        'GuideService requires a GuideServiceOptions under hostContext.options.guide',
+      );
     }
     this.loop = new AgentLoop(
       options.provider,

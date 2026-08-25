@@ -34,8 +34,8 @@ import type {
   TurnOutput,
   UndispatchedToolCall,
 } from './model.js';
-import type { BudgetPolicy, BudgetTracker, RandomSource } from './budget.js';
-import { InteractionBudget } from './budget.js';
+import type { BudgetPolicy, BudgetTracker } from './budget.js';
+import { DEFAULT_RANDOM, InteractionBudget } from './budget.js';
 import type { LlmProvider, TurnResultEntry } from './llm-provider.js';
 import type { ToolDispatchContext, ToolRegistry } from './tools.js';
 import { ToolRejectedError } from './tools.js';
@@ -56,9 +56,6 @@ export interface AgentLoopOptions {
 }
 
 const DEFAULT_MAX_TURNS = 20;
-
-/** A `Math.random` fallback for the overspend gate when the policy omits one. */
-const DEFAULT_RANDOM: RandomSource = { next: () => Math.random() };
 
 /**
  * The Guide's constrained-agent loop. Owns the working-memory holder and the

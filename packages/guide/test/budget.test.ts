@@ -78,36 +78,42 @@ describe('overspendProbability', () => {
 
 describe('BudgetTracker — composition', () => {
   it('computes budget as base + premium + carryover', () => {
-    const p = policy({ base: 10, premium: (types) => types.length * 2 });
+    const p = policy({ base: 10, premium: { a: 2, b: 2 } });
     const tracker = new BudgetTracker(p);
     expect(tracker.budgetFor([event('a'), event('b')])).toBe(14); // 10 + 4 + 0
+  });
+
+  it('treats unknown event types as zero premium', () => {
+    const p = policy({ base: 10, premium: { direct_address: 4 } });
+    const tracker = new BudgetTracker(p);
+    expect(tracker.budgetFor([event('scroll'), event('scroll')])).toBe(10); // 10 + 0 + 0
   });
 });
 
 describe('BudgetTracker — carryover (min(spent, remaining))', () => {
   it('peaks at half-budget spend', () => {
-    const p = policy({ base: 10, premium: () => 0 });
+    const p = policy({ base: 10, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(10, 5); // spent 5, remaining 5 -> min(5,5)=5
     expect(tracker.currentCarryover).toBe(5);
   });
 
   it('is zero when the Guide declines to act', () => {
-    const p = policy({ base: 10, premium: () => 0 });
+    const p = policy({ base: 10, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(10, 0); // spent 0, remaining 10 -> min(0,10)=0
     expect(tracker.currentCarryover).toBe(0);
   });
 
   it('is zero at full spend', () => {
-    const p = policy({ base: 10, premium: () => 0 });
+    const p = policy({ base: 10, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(10, 10); // spent 10, remaining 0 -> min(10,0)=0
     expect(tracker.currentCarryover).toBe(0);
   });
 
   it('is negative on overspend (debt carried forward)', () => {
-    const p = policy({ base: 5, premium: () => 0 });
+    const p = policy({ base: 5, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(5, 7); // spent 7, remaining -2 -> min(7,-2)=-2
     expect(tracker.currentCarryover).toBe(-2);
@@ -116,21 +122,21 @@ describe('BudgetTracker — carryover (min(spent, remaining))', () => {
 
 describe('BudgetTracker — pressure', () => {
   it('is zero initially and stays zero on frugal spend', () => {
-    const p = policy({ base: 10, premium: () => 0 });
+    const p = policy({ base: 10, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(10, 4); // remaining 6 >= 0 -> halve 0 -> 0
     expect(tracker.currentPressure).toBe(0);
   });
 
   it('grows by the overspend amount (after halving) on overspend', () => {
-    const p = policy({ base: 5, premium: () => 0 });
+    const p = policy({ base: 5, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(5, 7); // remaining -2 -> floor(0/2) + 2 = 2
     expect(tracker.currentPressure).toBe(2);
   });
 
   it('halves on a frugal interaction following an overspend', () => {
-    const p = policy({ base: 5, premium: () => 0 });
+    const p = policy({ base: 5, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(5, 7); // pressure 2
     expect(tracker.currentPressure).toBe(2);
@@ -139,14 +145,14 @@ describe('BudgetTracker — pressure', () => {
   });
 
   it('is non-negative (frugal after zero pressure stays zero)', () => {
-    const p = policy({ base: 10, premium: () => 0 });
+    const p = policy({ base: 10, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(10, 3); // floor(0/2)=0
     expect(tracker.currentPressure).toBe(0);
   });
 
   it('accumulates across repeated overspends', () => {
-    const p = policy({ base: 5, premium: () => 0 });
+    const p = policy({ base: 5, premium: {} });
     const tracker = new BudgetTracker(p);
     tracker.reportInteraction(5, 7); // pressure 2
     tracker.reportInteraction(5, 7); // floor(2/2)=1 + 2 = 3

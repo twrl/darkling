@@ -103,7 +103,7 @@ describe('AgentLoop — budget', () => {
     const policy: typeof DEFAULT_BUDGET_POLICY = {
       ...DEFAULT_BUDGET_POLICY,
       base: 5,
-      premium: () => 0,
+      premium: {},
     };
     // budget 5; a call costing 6 is an overspend of 1. With pressure 0 and
     // base 5 the gate probability is sigmoid(1 - 1/5) ≈ 0.78. A roll of 0.99
@@ -127,7 +127,7 @@ describe('AgentLoop — budget', () => {
     const policy: typeof DEFAULT_BUDGET_POLICY = {
       ...DEFAULT_BUDGET_POLICY,
       base: 5,
-      premium: () => 0,
+      premium: {},
     };
     // Same gate (≈0.78); a roll of 0.0 succeeds, so the overspend is
     // dispatched and consumed.
@@ -161,7 +161,7 @@ describe('AgentLoop — budget', () => {
     const policy: typeof DEFAULT_BUDGET_POLICY = {
       ...DEFAULT_BUDGET_POLICY,
       base: 5,
-      premium: () => 0,
+      premium: {},
     };
     // Interaction 1: overspend 1, pressure 0 -> prob ≈0.78, roll 0.0 succeeds.
     const loop = buildLoop(
@@ -268,7 +268,7 @@ describe('AgentLoop — budget carryover', () => {
     const policy: typeof DEFAULT_BUDGET_POLICY = {
       ...DEFAULT_BUDGET_POLICY,
       base: 10,
-      premium: () => 0,
+      premium: {},
     };
     const loop = buildLoop(
       [turns(call('avatar_say', { value: 'x' })), finished()],

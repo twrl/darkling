@@ -142,7 +142,11 @@ export class HttpLlmProvider implements LlmProvider {
 
   constructor(options: HttpLlmProviderOptions) {
     this.endpoint = options.endpoint;
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
+    // Bind the default fetch to globalThis: in a Web Worker, `fetch` is a
+    // method on the worker global scope and must be invoked with that scope
+    // as `this`. Capturing `globalThis.fetch` as a bare reference detaches it,
+    // producing "Illegal invocation" when called from the Guide worker.
+    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   async turn(request: LlmTurnRequest): Promise<TurnOutput> {

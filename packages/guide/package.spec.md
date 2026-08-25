@@ -80,7 +80,7 @@ The package exports the interaction model types defined by [Constrained agent](.
 
 #### Budget policy
 
-- `BudgetPolicy` — the policy parameters defined by [Budget policy](../../specs/event-system.spec.md#budget-policy): base, premium function, tool costs, and an optional injectable `RandomSource` for the probabilistic overspend gate.
+- `BudgetPolicy` — the policy parameters defined by [Budget policy](../../specs/event-system.spec.md#budget-policy): base, a premium map (event type → premium, summed over the flushed queue — a serialisable form of the premium function), tool costs, and an optional injectable `RandomSource` for the probabilistic overspend gate.
 - `DEFAULT_BUDGET_POLICY` — a conservative default; the host overrides via configuration, per [Policy and configuration](../../specs/policy-and-configuration.spec.md).
 - `BudgetTracker` — tracks carryover (`min(spent, remaining)`) and pressure (`max(0, floor(p/2) - min(0, remaining))`) across interactions, as defined by [Carryover](../../specs/event-system.spec.md#carryover) and [Pressure](../../specs/event-system.spec.md#pressure).
 - `InteractionBudget` — the budget state for an in-progress interaction, enforcing the cost-based bound and the probabilistic overspend gate (via `attemptDispatch`, which rolls the gate for overspend attempts), as defined by [Budget](../../specs/constrained-agent.spec.md#budget) and [Overspend](../../specs/event-system.spec.md#overspend). A denied overspend marks the budget exhausted and ends the interaction.

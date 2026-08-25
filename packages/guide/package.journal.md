@@ -2,6 +2,15 @@
 
 This journal records the development of the `@darkling/guide` package — the implementation of [constrained-agent.spec.md](../../specs/constrained-agent.spec.md), the budget policy of [event-system.spec.md](../../specs/event-system.spec.md), the `safety_consult` tool of [agent-safety.spec.md](../../specs/agent-safety.spec.md), and the LLM provider abstraction of [usage-and-deployment.spec.md](../../specs/usage-and-deployment.spec.md) as defined by [package.spec.md](./package.spec.md). It is non-normative; the specifications take precedence.
 
+## `BudgetPolicy.premium` as a map; `random` defaulting in the worker
+
+Established through dialogue with the user while wiring the Guide's frontend services. The root spec ([Event system — Budget composition](../../specs/event-system.spec.md#budget-composition)) defines the premium as "a function of the event types in the queue" and lists the "budget premium function" as a policy parameter; the guide package spec described `BudgetPolicy.premium` as a `(eventTypes: string[]) => number` function. The user directed two changes:
+
+- **`premium` is now `Record<string, number>`** — a map of event type → premium value, summed over the events in the flushed queue (event types with no entry default to 0). A map of event-types-to-values summed over the queue _is_ a function of the event types in the queue; it satisfies the root spec's requirement while being structured-cloneable, so the policy can cross `postMessage` to the Guide worker. `DEFAULT_BUDGET_POLICY.premium` is now `{ direct_address: 4 }` (the previous default gave every event a premium of 1 plus 4 for `direct_address`; the map drops the per-event 1, since a flat per-event premium can be expressed by adding entries for each event type if desired).
+- **`random` is optional and defaults to `Math.random`** — the package already defaulted an omitted `random` via `AgentLoop`'s `DEFAULT_RANDOM`. `MathRandom` is now exported and `DEFAULT_RANDOM` (a `new MathRandom()`) is exported from the package, so the worker constructs the policy from serialisable config and the loop supplies the default randomness. An injectable `RandomSource` remains for testing only.
+
+These are package API changes recorded against the established root spec; they do not modify the root spec's normative requirement (premium is a function of event types — a map summed over the queue satisfies this). `budgetFor` now sums the map: `events.reduce((sum, e) => sum + (policy.premium[e.type] ?? 0), 0)`.
+
 ## Origin
 
 Created in response to a request to "implement the agentic logic for the Guide." Established via the spec-anchored workflow: the applicable root specifications were already established, so this is an implementation package, not a new specification. The package spec and this journal were created per the repo pattern (one package per spec area, with a colocated `package.spec.md` and `package.journal.md`).
@@ -159,3 +168,7 @@ Full prompt/completion text is NOT logged (only request/response shape); this
 avoids leaking content into logs and keeps output concise. See
 `packages/observability/package.journal.md` for the cross-cutting decision and
 gaps (bus-aggregated / remote sinks; a possible future observability spec).
+
+## Bind default `fetch` to `globalThis` in the LLM providers
+
+The frontend Guide worker fired up but `HttpLlmProvider.turn` failed with `Failed to execute 'fetch' on 'WorkerGlobalScope': Illegal invocation`. Cause: the provider captured `globalThis.fetch` as a bare reference (`options.fetch ?? globalThis.fetch`), detaching it from its scope. In a Web Worker, `fetch` is a method on the worker global scope and must be called with that scope as `this`; a detached reference throws "Illegal invocation." Fixed by binding at capture: `globalThis.fetch.bind(globalThis)`. The same fix was applied to `OpenRouterLlmProvider` (backend, Node's undici fetch has the same detached-call issue). An injected `options.fetch` is used as-is (already bound by the caller).

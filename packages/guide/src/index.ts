@@ -59,8 +59,10 @@ export type { BudgetPolicy, RandomSource, DispatchAttempt } from './budget.js';
 
 export {
   DEFAULT_BUDGET_POLICY,
+  DEFAULT_RANDOM,
   BudgetTracker,
   InteractionBudget,
+  MathRandom,
   sigmoid,
   overspendProbability,
 } from './budget.js';

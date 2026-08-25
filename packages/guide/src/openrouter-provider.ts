@@ -158,7 +158,10 @@ export class OpenRouterLlmProvider implements LlmProvider {
     this.apiKey = options.apiKey;
     this.model = options.model;
     this.endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
+    // Bind the default fetch to globalThis so a bare reference isn't detached
+    // from its scope (e.g. Node's undici fetch or a worker's fetch would throw
+    // "Illegal invocation" if called unbound).
+    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.siteUrl = options.siteUrl;
     this.siteTitle = options.siteTitle;
     this.temperature = options.temperature;

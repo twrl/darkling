@@ -28,11 +28,14 @@ export interface RandomSource {
 }
 
 /** The default randomness source: `Math.random`. */
-class MathRandom implements RandomSource {
+export class MathRandom implements RandomSource {
   next(): number {
     return Math.random();
   }
 }
+
+/** The default randomness instance, used when a policy omits `random`. */
+export const DEFAULT_RANDOM: RandomSource = new MathRandom();
 
 /**
  * The budget policy parameters, as defined by
@@ -55,12 +58,19 @@ export interface BudgetPolicy {
   /** The fixed budget amount assigned to every interaction; also the denominator of the probabilistic overspend gate. */
   base: number;
   /**
-   * The function determining the premium based on the event types in the
-   * flushed queue, reflecting the expected cost of responding to those events.
-   * Event types that are expected to require more Guide effort (e.g. a direct
-   * address) carry a higher premium than routine events.
+   * The premium assigned to each event type, reflecting the expected cost of
+   * responding to those events. The premium for a flushed queue is the sum of
+   * the premiums of the events in it (event types with no entry default to
+   * 0). Event types that are expected to require more Guide effort (e.g. a
+   * direct address) carry a higher premium than routine events.
+   *
+   * This is a serialisable form of the premium function defined by
+   * [Budget composition](../../specs/event-system.spec.md#budget-composition):
+   * a map of event types to premium values, summed over the queue. Keeping
+   * the premium as data (rather than a function) lets the policy cross
+   * `postMessage` to a worker.
    */
-  premium: (eventTypes: string[]) => number;
+  premium: Record<string, number>;
   /**
    * The costs assigned to tool call types, keyed by tool name. The cost of
    * each tool is included in the tool's definition sent to the model, as
@@ -84,10 +94,8 @@ export interface BudgetPolicy {
  */
 export const DEFAULT_BUDGET_POLICY: BudgetPolicy = {
   base: 10,
-  premium: (eventTypes) =>
-    eventTypes.reduce((sum, type) => sum + (type === 'direct_address' ? 4 : 1), 0),
+  premium: { direct_address: 4 },
   toolCosts: {},
-  random: new MathRandom(),
 };
 
 /**
@@ -158,8 +166,8 @@ export class BudgetTracker {
    * [Budget composition](../../specs/event-system.spec.md#budget-composition).
    */
   budgetFor(events: GuideEvent[]): number {
-    const eventTypes = events.map((e) => e.type);
-    return this.policy.base + this.policy.premium(eventTypes) + this.carryover;
+    const premium = events.reduce((sum, e) => sum + (this.policy.premium[e.type] ?? 0), 0);
+    return this.policy.base + premium + this.carryover;
   }
 
   /**
