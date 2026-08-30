@@ -24,7 +24,7 @@ Where this specification depends on behaviour defined by domain specifications, 
 
 ## Design context
 
-Several domain specifications govern behaviour whose specific values are implementation-defined: the [Event system](./event-system.spec.md) owns budget and flush policy parameters; [Content-first retrieval](./content-first-retrieval.spec.md) owns retrieval policy parameters; [Agent safety](./agent-safety.spec.md) references the cost of `safety_consult` as a policy parameter; [Service bus](./service-bus.spec.md) references broker host-launch policy. Each of those specifications defines _which_ parameters exist and _what_ they govern, and requires that they have defined values, but leaves the specific values to implementation.
+Several domain specifications govern behaviour whose specific values are implementation-defined: [Constrained agent](./constrained-agent.spec.md) owns budget and flush policy parameters; [Content-first retrieval](./content-first-retrieval.spec.md) owns retrieval policy parameters; [Agent safety](./agent-safety.spec.md) references the cost of `safety_consult` as a policy parameter; [Service bus](./service-bus.spec.md) references broker host-launch policy. Each of those specifications defines _which_ parameters exist and _what_ they govern, and requires that they have defined values, but leaves the specific values to implementation.
 
 This specification extracts and unifies the structural rules common to all of those scattered policy parameters: that they must exist, must have defined values, must be resolvable through a configuration source, and must have a system-wide default. This avoids duplicating the structural contract across domain specs, establishes a uniform delivery mechanism, and provides a single place to reason about how policy values are provided to subsystems.
 
@@ -46,9 +46,9 @@ Feature: Policy parameters
   Rule: Every policy parameter must exist, have a defined value, and conform to its type
 
   Scenario: A defined parameter has a value
-    Given the event system specification defines the "Budget base" parameter
+    Given the constrained agent specification defines the "Budget base" parameter
     And the configuration source provides a value for "Budget base"
-    When the event system reads "Budget base"
+    When the constrained agent reads "Budget base"
     Then it must receive the provided value
 
   Scenario: An undefined parameter is not read
@@ -58,7 +58,7 @@ Feature: Policy parameters
     And the parameter must not be admitted into the configuration
 
   Scenario: A parameter with an invalid value is rejected
-    Given the event system specification defines "Trigger probability" with type "number in [0.0, 1.0]"
+    Given the constrained agent specification defines "Trigger probability" with type "number in [0.0, 1.0]"
     And the configuration source provides the value 1.5 for "Trigger probability"
     When the configuration is resolved
     Then the value 1.5 must be rejected
@@ -93,7 +93,7 @@ Feature: Configuration source
 
   Scenario: A subsystem does not read parameters it does not own
     Given the retrieval subsystem declares "Default result limit"
-    And the event system owns "Budget base"
+    And the constrained agent owns "Budget base"
     When the retrieval subsystem is constructed
     Then it must not read "Budget base"
 
@@ -223,13 +223,13 @@ Domain specifications own their policy parameters. This specification defines th
 
 The following domain specifications define policy parameters and are subject to this contract:
 
-- [Event system](./event-system.spec.md#policy-parameters) — trigger probabilities, budget composition, tool call costs, overspend, and carryover parameters.
+- [Constrained agent](./constrained-agent.spec.md#policy-parameters) — trigger probabilities, budget composition, tool call costs, overspend, and carryover parameters.
 - [Content-first retrieval](./content-first-retrieval.spec.md#policy-parameters) — filterable properties, match semantics, text search mechanism, ranking function, default result limit, and default sort policy.
 - [Usage and deployment](./usage-and-deployment.spec.md#cost-and-abuse-controls) — per-session spend caps, global rate limits (both tier-dependent), and session state persistence policies per access tier. These are resolved at startup from the split configuration (content repository + deployment environment), as defined in [Usage and deployment](./usage-and-deployment.spec.md#configuration).
 
 Other specifications reference policy parameters without a dedicated table:
 
-- [Agent safety](./agent-safety.spec.md#relationship-to-the-budget) — the cost of `safety_consult`, owned by the [Event system](./event-system.spec.md#policy-parameters) tool call costs parameter.
+- [Agent safety](./agent-safety.spec.md#relationship-to-the-budget) — the cost of `safety_consult`, owned by the [Constrained agent](./constrained-agent.spec.md#policy-parameters) tool call costs parameter.
 - [Service bus](./service-bus.spec.md#on-demand-activation) — the broker host-launch policy, which is a broker policy informed by service metadata, not a policy parameter governed by this specification.
 - [Authoring tooling](./authoring-tooling.spec.md#slug-uniqueness) — slug collision resolution policy, which is an implementation detail of compilation rather than a runtime policy parameter.
 

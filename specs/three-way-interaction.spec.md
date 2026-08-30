@@ -14,8 +14,8 @@ It governs:
 
 It is explicitly out of scope for this specification to define:
 
-- the event system that produces high-level semantic events, including the microbatching and hybrid immediate/probabilistic flush policy — see [Event system](./event-system.spec.md);
-- the mechanism by which the Guide's turn budget is enforced, and the constrained agent's tool-call discipline — see [Constrained agent](./constrained-agent.spec.md);
+- the agentic model that produces high-level semantic events, including the event queue and per-event probabilistic flush policy — see [Constrained agent](./constrained-agent.spec.md);
+- the mechanism by which the Guide's budget is enforced, and the constrained agent's tool-call discipline — see [Constrained agent](./constrained-agent.spec.md);
 - the content model and content-first retrieval — see [Content model](./content-model.spec.md) and [Content-first retrieval](./content-first-retrieval.spec.md);
 
 Where this specification depends on behaviour defined by those specifications, it links to them and states its requirement in terms of their observable behaviour, without redefining their mechanisms.
@@ -71,7 +71,7 @@ The User manipulates the Archive directly. User actions on the Archive are refle
 
 ### User → Guide
 
-The User may address the Guide with queries and responses. A User address to the Guide is a direct input that the Guide must acknowledge and respond to within the bounds of its turn budget, as defined by [Constrained agent](./constrained-agent.spec.md).
+The User may address the Guide with queries and responses. A User address to the Guide is a direct input that the Guide must acknowledge and respond to within the bounds of its budget, as defined by [Constrained agent](./constrained-agent.spec.md#budget).
 
 ### Guide → Archive
 
@@ -134,7 +134,7 @@ The Guide must appear responsive and autonomous while remaining an LLM operating
 The Guide's actions must not appear to be uniformly triggered by each discrete user input. To this end:
 
 - the Guide's responses to User activity must exhibit variable timing, so that the Guide appears to respond with spontaneous timing rather than as a deterministic reflex;
-- the mechanism that produces variable timing is the hybrid immediate/probabilistic flush policy of the event system, defined by [Event system](./event-system.spec.md).
+- the mechanism that produces variable timing is the per-event probabilistic flush policy of the agentic model, defined by [Constrained agent](./constrained-agent.spec.md#flush-policy).
 
 This specification requires the observable property of apparent spontaneity; it does not prescribe the flush policy itself.
 
@@ -142,12 +142,12 @@ This specification requires the observable property of apparent spontaneity; it 
 
 Each Guide interaction must be bounded in cost and duration:
 
-- the Guide operates within an explicit turn budget that bounds the number of reasoning steps and tool calls of an individual interaction, as defined by [Constrained agent](./constrained-agent.spec.md);
-- the Guide must not exceed its turn budget, and must produce a response to the User within the bounds of the current interaction.
+- the Guide operates within an explicit budget that bounds the cost of tool calls of an individual interaction, as defined by [Constrained agent](./constrained-agent.spec.md#budget);
+- the Guide may not exceed its budget, and must produce a response to the User within the bounds of the current interaction.
 
 ### Responsiveness to activity
 
-The Guide must be able to respond to the User's activity in the Archive, not only to direct addresses. That is, the Guide may initiate observations or interface manipulations in response to high-level semantic events produced by the User's navigation and attention, as defined by [Event system](./event-system.spec.md), subject to the conflict resolution rules in [Interface control](#interface-control).
+The Guide must be able to respond to the User's activity in the Archive, not only to direct addresses. That is, the Guide may initiate observations or interface manipulations in response to high-level semantic events produced by the User's navigation and attention, as defined by [Constrained agent](./constrained-agent.spec.md#events), subject to the conflict resolution rules in [Interface control](#interface-control).
 
 ```gherkin
 Feature: Guide responsiveness
@@ -162,7 +162,7 @@ Feature: Guide responsiveness
   Scenario: Guide observes User activity
     Given the User has opened a document producing a document_opened event
     And no direct address to the Guide has been made
-    When the event system flushes the event
+    When the agentic model flushes the event
     Then the Guide may respond with an observation or interface manipulation
     But the Guide may also decline to respond
 

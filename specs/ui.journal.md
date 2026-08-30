@@ -36,7 +36,7 @@ A consequence: the `interface` slice records *focus* (the block navigation prese
 
 The user selected all six proposed event types: `document_opened`, `document_closed`, `attention_drawn`, `relationship_traversed`, `direct_address`, `scroll`. The first three + `direct_address` were named or implied by existing specs; `document_closed`, `relationship_traversed`, and `scroll` are new. Each has a defined payload (document id, block id, relationship type, address text, blocks in view).
 
-- `direct_address` has trigger probability 1.0 (always flushes), per `event-system.spec.md`'s examples.
+- `direct_address` has trigger probability 1.0 (always flushes), per the constrained agent spec's examples (formerly `event-system.spec.md`, now consolidated into `constrained-agent.spec.md`).
 - `scroll` is the low-level browsing signal that drives microbatching (low trigger probability), carrying the blocks brought into view.
 - The spec explicitly states the Guide does not produce events, and internal UI state changes (animation completion, cache updates) do not produce events — closing a loophole the existing specs left open.
 
@@ -128,7 +128,7 @@ The user selected: event types & payloads, the rendering pipeline, the `interfac
 - ~~**`uiEstablishedActiveDocument` support in the state-manager package.**~~ **Resolved.** The `openedBy` refinement moves User-precedence enforcement to `navigate` tool-call dispatch, so no authority-side state or state-manager invariant-API extension is needed. See [User precedence via `openedBy` at tool-call dispatch (refinement)](#user-precedence-via-openedby-at-tool-call-dispatch-refinement).
 - **Rendering library.** The spec leaves the specific 3D rendering library (Three.js, etc.) as an implementation concern, requiring only the spatial model and main-thread UI logic. To be decided at implementation time.
 - **Speech visual treatment.** "Speech is rendered as text associated with the avatar (e.g. a speech region near the figure). The specific visual treatment is an implementation concern." Whether speech is a speech-bubble, a subtitle region, typed text, etc. is left open.
-- **`scroll` event throttling.** The `scroll` event carries the blocks brought into view; throttling/debouncing so scrolling doesn't flood the event queue is an implementation concern (the event system's microbatching will coalesce them, but the UI should still avoid producing events faster than meaningful).
+- **`scroll` event throttling.** The `scroll` event carries the blocks brought into view; throttling/debouncing so scrolling doesn't flood the event queue is an implementation concern (the agentic model's microbatching will coalesce them, but the UI should still avoid producing events faster than meaningful).
 - **Relationship link rendering.** Relationships are rendered as "navigable links within the document's content," but how a relationship is visually presented as a link (inline link, footnote, margin annotation) is an implementation concern.
 - **ToC when the stack is empty / initial state.** The spec defines the empty stack (ground plane + Guide, no active document) but not the initial bootstrap view before any document is opened. To be decided at implementation; likely the ToC tablet (or its minimised icon) invites the Visitor to open a document.
 - **Closing the active tablet and the Guide's continuity.** When the Visitor closes the active tablet, the next tablet becomes active. The spec doesn't address whether this counts as a "Visitor navigation" that updates `uiEstablishedActiveDocument` (it does — it's a ui-sourced action establishing the active document). Recorded for clarity.
@@ -142,7 +142,7 @@ The user selected: event types & payloads, the rendering pipeline, the `interfac
 
 ## Overlaps with other specifications
 
-- `event-system.spec.md` — owns the queue/flush/trigger/budget; this spec owns the event *types* and payloads it keys off. `direct_address` trigger probability 1.0 aligns with its examples.
+- `constrained-agent.spec.md` — owns the queue/flush/trigger/budget (formerly the event system spec, now consolidated into the constrained agent spec); this spec owns the event *types* and payloads it keys off. `direct_address` trigger probability 1.0 aligns with its examples.
 - `three-way-interaction.spec.md` — owns the roles, permitted operations (Navigate, Draw attention, Retrieve), and conflict-resolution rules. This spec defines the *rendering* of those operations and the *mechanism* (the `interface` slice invariants) that enforces the rules, not the rules.
 - `constrained-agent.spec.md` — owns the tool categories and discipline. This spec defines the specific `navigate`/`draw_attention` UI-control tools deferred by it.
 - `state-manager.spec.md` — owns the authority/local-copy/patch mechanism. This spec refines the `interface` slice's fields and invariants within that mechanism (the deferred refinement).
@@ -154,8 +154,7 @@ The user selected: event types & payloads, the rendering pipeline, the `interfac
 
 Added the `session_start` event type to the event vocabulary, with an empty
 payload, emitted once per page load when bootstrap is complete. This closes a
-gap: the existing specs established the event system and the Guide's
-event-triggered interaction model, but did not specify any mechanism by which
+gap: the existing specs established the Guide's event-triggered interaction model (now in the constrained agent spec), but did not specify any mechanism by which
 the Guide is triggered at the start of a session — the bootstrap sequence
 mounted the UI and said "the Guide begins consuming events," but produced no
 event to flush the queue for the first interaction.
@@ -166,7 +165,7 @@ The initial framing question was whether `session_start` is a system event
 (produced by the frontend) or a Visitor-activity event. The user's resolution:
 the Visitor *arriving* at the Archive is itself Visitor activity, so
 `session_start` is a Visitor-initiated event, not a system event. This avoids
-any amendment to the event system's "events are produced in response to User
+any amendment to the agentic model's "events are produced in response to User
 activity" source model — no exception clause is needed; arriving is activity.
 
 ### Decisions (per the spec-workflow dialogue)
@@ -191,12 +190,12 @@ activity" source model — no exception clause is needed; arriving is activity.
   start. (Mirrors `direct_address`.)
 - **Premium left to implementation.** A greeting is cheap; a small premium is
   appropriate. The value is a policy parameter (the premium function is a
-  policy parameter in event-system.spec.md), not fixed in the spec —
+  policy parameter in the constrained agent spec), not fixed in the spec —
   consistent with how `direct_address` etc. are handled.
 
 The amendments touch ui.spec.md (event-type table + a Session start
-subsection + a Gherkin scenario), event-system.spec.md (a clarifying sentence
-in Trigger probability + a flush scenario), and usage-and-deployment.spec.md
+subsection + a Gherkin scenario), the constrained agent spec (a clarifying sentence
+in Trigger probability + a flush scenario; formerly event-system.spec.md), and usage-and-deployment.spec.md
 (a bootstrap-sequence step + a Gherkin assertion). The constrained-agent
 spec's interaction input shape is unchanged — `session_start` appears in the
 event queue like any other event.

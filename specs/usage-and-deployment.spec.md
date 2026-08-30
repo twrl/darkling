@@ -16,7 +16,7 @@ It governs:
 
 It is explicitly out of scope for this specification to define:
 
-- the internal behaviour of the subsystems — the service bus, event system, constrained agent, content model, retrieval, annotations, and policy and configuration — which are defined by their respective specifications;
+- the internal behaviour of the subsystems — the service bus, constrained agent, content model, retrieval, annotations, and policy and configuration — which are defined by their respective specifications;
 - the specific LLM provider or its API — which is a configuration choice, as defined in [LLM provider abstraction](#llm-provider-abstraction);
 - the specific persistent store technology (e.g. Upstash, Redis) — which is an implementation concern;
 - the authoring format and compilation pipeline internals — which are defined by [Authoring tooling](./authoring-tooling.spec.md).
@@ -488,8 +488,8 @@ On page load, the frontend bootstraps the runtime:
 3. The retrieval/cache worker is started, connecting to the backend over HTTP, opening the IndexedDB cache, and fetching the table of contents, as defined in [Client-side retrieval and caching](#client-side-retrieval-and-caching).
 4. The Guide agent loop worker is started, connecting to the service bus.
 5. The UI is mounted on the main thread, producing events as the Visitor interacts.
-6. The UI emits `session_start` (trigger probability 1.0), which flushes the event queue and triggers the Guide's first interaction, as defined by [User interface](./ui.spec.md#session-start). The Guide may greet the Visitor or decline to act (return FINISHED), as permitted by [Constrained agent](./constrained-agent.spec.md).
-7. The Guide begins consuming events and responding, as defined by [Constrained agent](./constrained-agent.spec.md) and [Event system](./event-system.spec.md).
+6. The UI emits `session_start` (trigger probability 1.0), which flushes the event queue and triggers the Guide's first interaction, as defined by [User interface](./ui.spec.md#session-start). The Guide may greet the Visitor or decline to act (return FINISHED), as permitted by [Constrained agent](./constrained-agent.spec.md#finished).
+7. The Guide begins consuming events and responding, as defined by [Constrained agent](./constrained-agent.spec.md).
 
 Policy and configuration values are resolved at startup, as defined by [Policy and configuration](./policy-and-configuration.spec.md#static-resolution). The backend's configuration (LLM provider, persistent store connection, pre-shared secrets, spend caps, rate limits, persistence policies) is resolved when the serverless function initialises, from the content repository's config file and the deployment environment, as defined in [Configuration](#configuration).
 
@@ -512,8 +512,7 @@ Feature: Bootstrap
 ## Relationship to other specifications
 
 - [Service bus](./service-bus.spec.md) — the bus runs on the frontend across Web Workers; the backend is not on the bus. The bus's Transferable object support enables frame and canvas transfer for UI rendering.
-- [Event system](./event-system.spec.md) — the event queue and flush policy run on the frontend; events are produced by the UI and consumed by the Guide.
-- [Constrained agent](./constrained-agent.spec.md) — the Guide's agent loop runs in a worker on the frontend; LLM calls are proxied through the backend. Session state persistence (per-tier, configurable) is established here, resolving the "implementation policy" gap noted in the constrained agent spec.
+- [Constrained agent](./constrained-agent.spec.md) — the agentic model (event queue, flush policy, interaction triggering, budget) and the Guide's agent loop run on the frontend; events are produced by the UI and consumed by the Guide. LLM calls are proxied through the backend. Session state persistence (per-tier, configurable) is established here, resolving the "implementation policy" gap noted in the constrained agent spec.
 - [Content model](./content-model.spec.md) — the compiled model is produced by the backend and stored in the persistent store; the frontend retrieves it over HTTP.
 - [Content-first retrieval](./content-first-retrieval.spec.md) — retrieval executes on the backend (querying the persistent store); the frontend caches results in IndexedDB and fetches a table of contents at bootstrap. The per-index provider interfaces are the abstraction boundary.
 - [Authoring tooling](./authoring-tooling.spec.md) — the backend compiles source Markdown from an external git repository on webhook, conforming to the compilation contract. Content-specific configuration lives in the content repository.

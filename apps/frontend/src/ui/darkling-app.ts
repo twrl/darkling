@@ -138,7 +138,7 @@ export class DarklingApp extends SignalWatcher(LitElement) {
 
   /**
    * Handle a flush of the event queue: run one Guide interaction via the bus,
-   * as defined by [Event system](../../specs/event-system.spec.md#interaction-triggering)
+   * as defined by [Constrained agent](../../specs/constrained-agent.spec.md#interaction-triggering)
    * and [Constrained agent](../../specs/constrained-agent.spec.md).
    *
    * The event queue is marked as in-progress for the duration of the call so

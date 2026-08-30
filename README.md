@@ -12,11 +12,10 @@ This creates an unusual design problem: the Guide needs to appear responsive and
 
 The system is built around several interacting subsystems:
 
- * Service bus — lightweight services run across Web Workers and are activated on demand.
- * Event system — the interface produces high-level semantic events such as document_opened, rather than exposing low-level UI events to the Guide. Events are microbatched and flushed using a hybrid immediate/probabilistic policy, reducing LLM calls and token usage while allowing the Guide to respond with apparently spontaneous timing.
- * Constrained agent — the Guide interacts with the Archive exclusively through tool calls. Interleaved reasoning is supported, while an explicit turn budget bounds the cost and duration of individual interactions.
- * Semantic content system — Archive material is authored as semantically enriched Markdown and compiled into addressable content blocks with structural metadata and typed relationships. Custom remark plugins and a VS Code extension support authoring.
- * Content-first retrieval — the Guide can retrieve blocks directly by ID, search by selected properties such as title, or search their textual content. Relationships between blocks provide an additional navigation mechanism.
+- Service bus — lightweight services run across Web Workers and are activated on demand.
+- Constrained agent — the Guide's agentic model. The interface produces high-level semantic events such as document_opened, rather than exposing low-level UI events to the Guide. Events accumulate in a queue and are flushed by a per-event probabilistic policy, reducing LLM calls and token usage while allowing the Guide to respond with apparently spontaneous timing. The Guide interacts with the Archive exclusively through tool calls, and a cost-based budget bounds the cost and duration of individual interactions.
+- Semantic content system — Archive material is authored as semantically enriched Markdown and compiled into addressable content blocks with structural metadata and typed relationships. Custom remark plugins and a VS Code extension support authoring.
+- Content-first retrieval — the Guide can retrieve blocks directly by ID, search by selected properties such as title, or search their textual content. Relationships between blocks provide an additional navigation mechanism.
 
 The current retrieval model evolved from an OWL2-RL knowledge graph and a more conventional KAG approach. While formal entailment provides useful guarantees, those guarantees do not map particularly well onto a general-purpose LLM—especially one deliberately designed to be an imperfect narrator. The current design instead retains explicit semantic relationships while presenting the model primarily with textual content and navigable structure.
 

@@ -38,7 +38,9 @@ The constrained agent has been established as [constrained-agent.spec.md](./cons
 
 ### Update: event system spec established
 
-The event system has been established as [event-system.spec.md](./event-system.spec.md). It defines high-level semantic events, the event queue, microbatching, the hybrid immediate/probabilistic flush policy, probabilistic interaction triggering, and budget policy (amount, costs, overspend, carryover). This resolves the apparent-spontaneity mechanism: the hybrid flush policy produces the variable timing required by this spec. The three-way interaction spec's references to the event system are confirmed as consistent.
+The event system was established as [event-system.spec.md](./event-system.spec.md). It defined high-level semantic events, the event queue, microbatching, the per-event probabilistic flush policy, probabilistic interaction triggering, and budget policy (amount, costs, overspend, carryover). This resolved the apparent-spontaneity mechanism: the probabilistic flush policy produces the variable timing required by this spec. The three-way interaction spec's references to the event system were confirmed as consistent.
+
+> **Note:** The event-system spec has since been consolidated into [Constrained agent](./constrained-agent.spec.md); references that formerly pointed to `event-system.spec.md` now point to the corresponding sections of the constrained agent spec. The historical narrative above reflects the state prior to consolidation.
 
 ### Update: content-first retrieval spec established
 
@@ -64,7 +66,7 @@ The permitted actions (Navigate, Draw attention, Retrieve) are drawn directly fr
 
 ### Apparent spontaneity as an observable property
 
-Rather than prescribing the flush policy here, the spec states the observable property (variable, non-deterministic timing) and delegates the mechanism to the event system spec. This keeps the interaction model spec focused on roles and protocols while still characterising the Guide's responsiveness normatively. A Gherkin scenario asserts that equivalent user actions must produce varying response timing.
+Rather than prescribing the flush policy here, the spec states the observable property (variable, non-deterministic timing) and delegates the mechanism to the constrained agent spec (formerly the event system spec, now consolidated into it). This keeps the interaction model spec focused on roles and protocols while still characterising the Guide's responsiveness normatively. A Gherkin scenario asserts that equivalent user actions must produce varying response timing.
 
 ## Gaps and ambiguities
 

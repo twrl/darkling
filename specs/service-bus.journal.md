@@ -92,7 +92,7 @@ Callers interact with the bus through promises, not raw message passing. The bro
 
 ### Relationship to other specs
 
-The spec explicitly maps the bus to the constrained agent (tool call dispatch, parallel execution), content-first retrieval (indexes as services), and event system (event production as services). This makes the bus's role as the execution substrate clear without defining the services themselves.
+The spec explicitly maps the bus to the constrained agent (tool call dispatch, parallel execution, agentic model event production as services) and content-first retrieval (indexes as services). This makes the bus's role as the execution substrate clear without defining the services themselves. (The former event system spec, separately referenced here prior to consolidation, has been merged into the constrained agent spec.)
 
 ## Gaps and ambiguities
 

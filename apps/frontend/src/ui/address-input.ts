@@ -12,7 +12,7 @@ import { customElement, state } from 'lit/decorators.js';
 /**
  * The address input. Part of the UI chrome, not the tablets. Submitting
  * produces a `direct_address` event (which always flushes the event queue,
- * per event-system.spec.md).
+ * per constrained-agent.spec.md).
  */
 @customElement('address-input')
 export class AddressInput extends LitElement {

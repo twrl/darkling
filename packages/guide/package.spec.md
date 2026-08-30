@@ -14,13 +14,13 @@ It governs:
 - the budget policy mechanics (composition, overspend, carryover);
 - the LLM provider abstraction and the HTTP backend-proxy client;
 - the service-bus integration — the Guide agent service declaration and implementation;
-- the conformance of the package to [Constrained agent](../../specs/constrained-agent.spec.md), the budget policy of [Event system](../../specs/event-system.spec.md), the `safety_consult` tool of [Agent safety](../../specs/agent-safety.spec.md), and the LLM provider abstraction of [Usage and deployment](../../specs/usage-and-deployment.spec.md), which remain the normative specifications for their respective subsystems.
+- the conformance of the package to [Constrained agent](../../specs/constrained-agent.spec.md) (which now includes the former event-system specification — events, queue, flush, triggering, and budget), the `safety_consult` tool of [Agent safety](../../specs/agent-safety.spec.md), and the LLM provider abstraction of [Usage and deployment](../../specs/usage-and-deployment.spec.md), which remain the normative specifications for their respective subsystems.
 
 It is explicitly out of scope for this specification to define:
 
-- the normative requirements of the constrained agent, event system, agent safety, or three-way interaction model — which are defined by their respective root specifications;
+- the normative requirements of the constrained agent, agent safety, or three-way interaction model — which are defined by their respective root specifications;
 - the specific tools within the avatar-and-user-interaction, ui-control, and knowledge-base-access categories — which are defined by their respective domain specifications (not yet established). This package provides the registry and dispatch mechanism; the host registers concrete tools;
-- the event system's flush policy and interaction triggering — which are owned by [Event system](../../specs/event-system.spec.md). This package consumes a flushed event queue and runs one interaction; it does not own the queue, the roll, or the trigger;
+- the agentic model's flush policy and interaction triggering — which are owned by [Constrained agent](../../specs/constrained-agent.spec.md#flush-policy). This package consumes a flushed event queue and runs one interaction; it does not own the queue, the roll, or the trigger;
 - the three-way interaction conflict resolution (User precedence) — which is owned by [Three-way interaction](../../specs/three-way-interaction.spec.md). UI-control tools are registered by the host and are responsible for yielding to User actions themselves;
 - the specific LLM provider or the backend proxy's wire format beyond the default contract — which are implementation and configuration concerns.
 
@@ -30,8 +30,8 @@ Where this specification depends on behaviour defined by the root specifications
 
 This package conforms to:
 
-- [Constrained agent](../../specs/constrained-agent.spec.md) — defines the agentic model (events, turns, interaction input, model output), the Guide as a constrained actor, the tool-call discipline, the four tool categories, working memory, FINISHED, the cost-based budget, and undispatched tool calls. This package implements the agent loop that enforces these requirements.
-- [Event system](../../specs/event-system.spec.md) — owns the budget policy: composition (base + premium + carryover, where carryover is `min(spent, remaining)`), tool call costs, a non-negative decaying pressure value, and a probabilistic overspend gate. This package implements the policy mechanics and the `BudgetTracker` / `InteractionBudget` bookkeeping; the policy values are parameters provided to the loop.
+- [Constrained agent](../../specs/constrained-agent.spec.md) — defines the agentic model (events, the event queue, the per-event probabilistic flush policy, interaction triggering, turns, interaction input, model output), the Guide as a constrained actor, the tool-call discipline, the four tool categories, working memory, FINISHED, the cost-based budget (composition, overspend, pressure, carryover), and undispatched tool calls. This package implements the agent loop that enforces these requirements.
+- [Constrained agent (budget)](../../specs/constrained-agent.spec.md#budget) — owns the budget policy: composition (base + premium + carryover, where carryover is `min(spent, remaining)`), tool call costs, a non-negative decaying pressure value, and a probabilistic overspend gate. This package implements the policy mechanics and the `BudgetTracker` / `InteractionBudget` bookkeeping; the policy values are parameters provided to the loop.
 - [Agent safety](../../specs/agent-safety.spec.md) — defines the `safety_consult` tool and the tiered advice model. This package implements the tool declaration, the host-injected `SafetyConsultant` seam, and the tiered-advice return schema.
 - [Usage and deployment](../../specs/usage-and-deployment.spec.md) — defines the LLM provider abstraction and the backend proxy. This package defines the provider-agnostic `LlmProvider` interface and an `HttpLlmProvider` client that calls the backend proxy.
 
@@ -41,7 +41,7 @@ The package does not restate the normative requirements of those specifications.
 
 The Guide operates as an agent driven by events from the UI, as defined by [Agentic model](../../specs/constrained-agent.spec.md#agentic-model). This package implements the loop that runs in the Guide's dedicated Web Worker, as defined by [Runtime topology](../../specs/usage-and-deployment.spec.md#runtime-topology). The loop is worker-safe: it uses no Node.js or DOM APIs and depends only on the injected `LlmProvider`, `ToolRegistry`, and `BudgetTracker`.
 
-The package is the execution substrate for the constrained-agent discipline. It does not own the event queue or the trigger (the event system does); it consumes a flushed event queue when triggered and runs one interaction, returning the outcome. The host (the frontend) is responsible for queueing events, rolling for flush, and calling `runInteraction` when a flush occurs.
+The package is the execution substrate for the constrained-agent discipline. It does not own the event queue or the trigger (the agentic model does, as defined by [Constrained agent](../../specs/constrained-agent.spec.md#flush-policy)); it consumes a flushed event queue when triggered and runs one interaction, returning the outcome. The host (the frontend) is responsible for queueing events, rolling for flush, and calling `runInteraction` when a flush occurs.
 
 ## Public API surface
 
@@ -53,7 +53,7 @@ The package is consumed via the main subpath (`@darkling/guide`) and the service
 
 The package exports the interaction model types defined by [Constrained agent](../../specs/constrained-agent.spec.md):
 
-- `GuideEvent` — a high-level semantic event (type, timestamp, payload), as defined by [Event system](../../specs/event-system.spec.md#events). The payload is opaque to the loop.
+- `GuideEvent` — a high-level semantic event (type, timestamp, payload), as defined by [Constrained agent](../../specs/constrained-agent.spec.md#events). The payload is opaque to the loop.
 - `ToolCall`, `ToolResult` — a tool call issued by the model and the result of dispatching it.
 - `InteractionInput` — the event queue and status object sent to the model, as defined by [Interaction input](../../specs/constrained-agent.spec.md#interaction-input).
 - `InteractionStatus` — the status object: budget, working memory, undispatched tool calls.
@@ -66,7 +66,7 @@ The package exports the interaction model types defined by [Constrained agent](.
 #### Tool registry and categories
 
 - `ToolCategory` — the union of the four permitted categories, as defined by [Tool categories](../../specs/constrained-agent.spec.md#tool-categories).
-- `ToolDeclaration` — a tool's name, category, Zod parameter/return schemas, cost, and description. The cost and description are included in the tool's definition sent to the model, as required by [Tool call costs](../../specs/event-system.spec.md#tool-call-costs).
+- `ToolDeclaration` — a tool's name, category, Zod parameter/return schemas, cost, and description. The cost and description are included in the tool's definition sent to the model, as required by [Cost model](../../specs/constrained-agent.spec.md#cost-model).
 - `ToolHandler` — a function executing a tool call.
 - `ToolDispatchContext` — the context provided to a handler: remaining budget, host capabilities, and working-memory access.
 - `ToolRegistry` — the injectable registry. Enforces the four-category taxonomy at registration; rejects unknown tools, prohibited categories, and invalid parameters at dispatch, as required by [Prohibited tools](../../specs/constrained-agent.spec.md#prohibited-tools). Validates parameters and return values against Zod schemas.
@@ -80,11 +80,11 @@ The package exports the interaction model types defined by [Constrained agent](.
 
 #### Budget policy
 
-- `BudgetPolicy` — the policy parameters defined by [Budget policy](../../specs/event-system.spec.md#budget-policy): base, a premium map (event type → premium, summed over the flushed queue — a serialisable form of the premium function), tool costs, and an optional injectable `RandomSource` for the probabilistic overspend gate.
+- `BudgetPolicy` — the policy parameters defined by [Budget](../../specs/constrained-agent.spec.md#budget): base, a premium map (event type → premium, summed over the flushed queue — a serialisable form of the premium function), tool costs, and an optional injectable `RandomSource` for the probabilistic overspend gate.
 - `DEFAULT_BUDGET_POLICY` — a conservative default; the host overrides via configuration, per [Policy and configuration](../../specs/policy-and-configuration.spec.md).
-- `BudgetTracker` — tracks carryover (`min(spent, remaining)`) and pressure (`max(0, floor(p/2) - min(0, remaining))`) across interactions, as defined by [Carryover](../../specs/event-system.spec.md#carryover) and [Pressure](../../specs/event-system.spec.md#pressure).
-- `InteractionBudget` — the budget state for an in-progress interaction, enforcing the cost-based bound and the probabilistic overspend gate (via `attemptDispatch`, which rolls the gate for overspend attempts), as defined by [Budget](../../specs/constrained-agent.spec.md#budget) and [Overspend](../../specs/event-system.spec.md#overspend). A denied overspend marks the budget exhausted and ends the interaction.
-- `sigmoid`, `overspendProbability` — the logistic sigmoid and the gate probability function `sigmoid(1 - (floor(pressure/2) + proposed_overspend) / base)`, as defined by [Overspend](../../specs/event-system.spec.md#overspend).
+- `BudgetTracker` — tracks carryover (`min(spent, remaining)`) and pressure (`max(0, floor(p/2) - min(0, remaining))`) across interactions, as defined by [Carryover](../../specs/constrained-agent.spec.md#carryover) and [Pressure](../../specs/constrained-agent.spec.md#pressure).
+- `InteractionBudget` — the budget state for an in-progress interaction, enforcing the cost-based bound and the probabilistic overspend gate (via `attemptDispatch`, which rolls the gate for overspend attempts), as defined by [Budget](../../specs/constrained-agent.spec.md#budget) and [Overspend](../../specs/constrained-agent.spec.md#overspend). A denied overspend marks the budget exhausted and ends the interaction.
+- `sigmoid`, `overspendProbability` — the logistic sigmoid and the gate probability function `sigmoid(1 - (floor(pressure/2) + proposed_overspend) / base)`, as defined by [Overspend](../../specs/constrained-agent.spec.md#overspend).
 - `RandomSource`, `DispatchAttempt` — the randomness source interface and the `'ok' | 'denied'` dispatch-attempt result.
 
 #### LLM provider
@@ -114,7 +114,7 @@ An implementation of this package conforms when:
 - the agent loop enforces the tool-call discipline: the model responds through tool calls or FINISHED; tool calls outside the four categories are rejected; free text is not produced, as defined by [Constrained agent](../../specs/constrained-agent.spec.md);
 - the loop dispatches tool calls in parallel within a turn, enforces the cost-based budget, ends the interaction on FINISHED or budget exhaustion, and carries undispatched tool calls to the next interaction;
 - working memory is replaced wholesale via `update_working_memory` and persists across interactions, surfacing in the next interaction's status;
-- the budget is composed of base + premium + carryover, with bounded overspend and signed, capped, decaying carryover, as defined by [Event system](../../specs/event-system.spec.md#budget-policy);
+- the budget is composed of base + premium + carryover, with the probabilistic overspend gate and `min(spent, remaining)` carryover, as defined by [Budget](../../specs/constrained-agent.spec.md#budget);
 - the `safety_consult` tool is in the agent-self category, invokes a separate LLM agent via the host-injected `SafetyConsultant`, and returns tiered advice conforming to the advice structure, as defined by [Agent safety](../../specs/agent-safety.spec.md);
 - the `LlmProvider` interface accommodates the constrained-agent interaction model and maps the provider's completion signal to FINISHED;
 - the service-bus integration exposes the agent loop as a `guide` service with a Zod-validated `runInteraction` function, as defined by [Service bus](../../specs/service-bus.spec.md);

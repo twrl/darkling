@@ -10,14 +10,14 @@ It governs:
 - the reading surface — how documents and content blocks are rendered and navigated, including the table of contents and in-content relationship links;
 - the Guide's avatar presentation — the Guide's visible figure and speech, and its placement within the scene;
 - attention — how the Guide's Draw-attention operation is rendered transiently on a content block;
-- the high-level semantic event vocabulary — the controlled set of event types the UI produces and their payloads, owed to [Event system](./event-system.spec.md#events);
+- the high-level semantic event vocabulary — the controlled set of event types the UI produces and their payloads, owed to [Constrained agent](./constrained-agent.spec.md#events);
 - the interface operations exposed to both the Visitor and the Guide — Navigate and Draw attention, as defined by [Three-way interaction](./three-way-interaction.spec.md#interface-control), and the UI-control tools that back the Guide's invocation of them;
 - the `interface` state slice — its concrete fields and conflict-resolution invariants, as a refinement of [State manager](./state-manager.spec.md#state-model), enforcing the conflict-resolution rules defined by [Three-way interaction](./three-way-interaction.spec.md#conflict-resolution);
 - cap-enforcement presentation — the in-world "rest" surface, as required by [Usage and deployment](./usage-and-deployment.spec.md#cap-enforcement).
 
 It is explicitly out of scope for this specification to define:
 
-- the event queue, the probabilistic flush policy, interaction triggering, and the budget — which are defined by [Event system](./event-system.spec.md);
+- the event queue, the probabilistic flush policy, interaction triggering, and the budget — which are defined by [Constrained agent](./constrained-agent.spec.md);
 - the constrained agent's tool-call discipline, the four tool categories, working memory, and FINISHED — which are defined by [Constrained agent](./constrained-agent.spec.md);
 - the three-way interaction model — the roles of the User, Archive, and Guide, and the conflict-resolution rules themselves (User precedence, non-preemption, Guide continuity) — which are defined by [Three-way interaction](./three-way-interaction.spec.md). This specification defines the *mechanism* by which the `interface` slice enforces those rules, not the rules;
 - the content model — documents, content blocks, relationships, and the compiled content format — which are defined by [Content model](./content-model.spec.md) and [Authoring tooling](./authoring-tooling.spec.md);
@@ -293,9 +293,9 @@ Feature: Attention
 
 ## Events
 
-The UI produces high-level semantic events in response to Visitor activity, as required by [Event system](./event-system.spec.md#events). This section establishes the controlled vocabulary of event types and their payloads, owed to [Event system](./event-system.spec.md#events).
+The UI produces high-level semantic events in response to Visitor activity, as required by [Constrained agent](./constrained-agent.spec.md#events). This section establishes the controlled vocabulary of event types and their payloads, owed to [Constrained agent](./constrained-agent.spec.md#events).
 
-Every event carries a `type`, a `timestamp`, and a `payload`, and is immutable once produced, as defined by [Event system](./event-system.spec.md#event-structure). The event types and their payloads are defined below. The trigger probability for each event type is a policy parameter owned by [Event system](./event-system.spec.md#policy-parameters); this specification defines the event *types*, not their trigger probabilities.
+Every event carries a `type`, a `timestamp`, and a `payload`, and is immutable once produced, as defined by [Constrained agent](./constrained-agent.spec.md#event-structure). The event types and their payloads are defined below. The trigger probability for each event type is a policy parameter owned by [Constrained agent](./constrained-agent.spec.md#policy-parameters); this specification defines the event *types*, not their trigger probabilities.
 
 ### Event types
 
@@ -320,18 +320,18 @@ The `session_start` event marks the Visitor's arrival at the Archive. It is prod
 
 - `session_start` is emitted exactly once per page load. A page reload begins a new session and emits `session_start` again, since the Guide worker is freshly started each load.
 - `session_start` is emitted before the UI accepts Visitor input that produces other events, so it is the sole event in the queue when its flush triggers the Guide's first interaction.
-- `session_start` has a trigger probability of 1.0, as defined in [Event system](./event-system.spec.md#trigger-probability): the Guide is always triggered once at session start.
+- `session_start` has a trigger probability of 1.0, as defined in [Constrained agent](./constrained-agent.spec.md#trigger-probability): the Guide is always triggered once at session start.
 - The payload is empty. Session context the Guide may need is available through other channels: the status object carries working memory and budget, as defined by [Constrained agent](./constrained-agent.spec.md#interaction-input), and the Guide may retrieve the Archive's contents through the retrieval tools, as defined by [Content-first retrieval](./content-first-retrieval.spec.md).
 
 ### Event sources and non-events
 
-Events are produced by the UI in response to Visitor activity, as defined by [Event system](./event-system.spec.md#event-sources). The Guide does not produce events; the Guide consumes them. Guide-initiated actions (tool calls) produce their effects through the [Constrained agent](./constrained-agent.spec.md) and the UI-control operations defined here, not through the event system.
+Events are produced by the UI in response to Visitor activity, as defined by [Constrained agent](./constrained-agent.spec.md#event-sources). The Guide does not produce events; the Guide consumes them. Guide-initiated actions (tool calls) produce their effects through the [Constrained agent](./constrained-agent.spec.md) and the UI-control operations defined here, not through the event system.
 
 The UI must not produce events for:
 
 - Guide actions (navigation, attention, speech) — these are not Visitor activity;
 - internal UI state changes that do not reflect Visitor activity (e.g. a tablet transition animation completing, a cache update);
-- raw input events (clicks, keystrokes) — the UI produces high-level semantic events, not raw input, as defined by [Event system](./event-system.spec.md#events).
+- raw input events (clicks, keystrokes) — the UI produces high-level semantic events, not raw input, as defined by [Constrained agent](./constrained-agent.spec.md#events).
 
 ### `attention_drawn` vs Guide Draw-attention
 
@@ -390,7 +390,7 @@ Feature: Events
 The Visitor may directly address the Guide. A direct address is the mechanism by which the Visitor asks the Guide a question or responds to the Guide.
 
 - The UI provides an address input by which the Visitor composes and submits a direct address to the Guide.
-- Submitting a direct address produces a `direct_address` event with the address text as its payload, as defined in [Events](#events). A `direct_address` event has a trigger probability of 1.0, as defined by [Event system](./event-system.spec.md#trigger-probability): a direct address always flushes the event queue and triggers an interaction.
+- Submitting a direct address produces a `direct_address` event with the address text as its payload, as defined in [Events](#events). A `direct_address` event has a trigger probability of 1.0, as defined by [Constrained agent](./constrained-agent.spec.md#trigger-probability): a direct address always flushes the event queue and triggers an interaction.
 - The address input is part of the UI chrome, not part of the tablets. Its specific placement and visual treatment is an implementation concern.
 
 The address input is the sole channel for direct Visitor-to-Guide communication. The Guide responds through its avatar's speech, as defined in [Speech](#speech).

@@ -1,7 +1,7 @@
 /**
  * Tests for the `session_start` event factory and its trigger-probability
  * default, as established by [User interface](../../specs/ui.spec.md#session-start)
- * and [Event system](../../specs/event-system.spec.md#trigger-probability).
+ * and [Constrained agent](../../specs/constrained-agent.spec.md#trigger-probability).
  *
  * @see apps/frontend/src/events/event-types.ts
  * @see apps/frontend/src/events/event-queue.ts

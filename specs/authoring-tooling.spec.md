@@ -18,7 +18,7 @@ It is explicitly out of scope for this specification to define:
 
 - the content model — the structure, identity, metadata, and relationships of documents and content blocks — which is defined by [Content model](./content-model.spec.md);
 - the retrieval interface — which is defined by [Content-first retrieval](./content-first-retrieval.spec.md);
-- the constrained agent and event system — which are defined by their respective specifications.
+- the constrained agent — which is defined by [Constrained agent](./constrained-agent.spec.md).
 
 This specification defines how source material is authored and compiled; the content model defines what the compiled result must conform to. Where the content model defers a detail to this specification, this specification establishes it.
 

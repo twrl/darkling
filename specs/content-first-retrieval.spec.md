@@ -15,7 +15,7 @@ It governs:
 It is explicitly out of scope for this specification to define:
 
 - the content model — the structure, identity, metadata, and relationships of documents and content blocks — which is defined by [Content model](./content-model.spec.md);
-- the constrained agent's tool-call discipline, the knowledge base access tool category, and the budget — which are defined by [Constrained agent](./constrained-agent.spec.md) and [Event system](./event-system.spec.md);
+- the constrained agent's tool-call discipline, the knowledge base access tool category, and the budget — which are defined by [Constrained agent](./constrained-agent.spec.md);
 - the three-way interaction model — which is defined by [Three-way interaction](./three-way-interaction.spec.md);
 - the authoring format and compilation tooling — which are defined by [Authoring tooling](./authoring-tooling.spec.md).
 

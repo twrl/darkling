@@ -1,7 +1,7 @@
 /**
  * Budget policy mechanics for Guide interactions.
  *
- * The budget policy is owned by [Event system](../../specs/event-system.spec.md#budget-policy):
+ * The budget policy is owned by [Constrained agent](../../specs/constrained-agent.spec.md#budget):
  * each interaction's budget is composed of base + premium + carryover, where
  * the carryover is `min(spent, remaining)` from the previous interaction
  * (positive for partial spend, negative for overspend). Overspend is governed
@@ -15,7 +15,6 @@
  * [Budget](../../specs/constrained-agent.spec.md#budget). This module
  * implements the policy values and the carryover/pressure bookkeeping.
  *
- * @see specs/event-system.spec.md#budget-policy
  * @see specs/constrained-agent.spec.md#budget
  */
 
@@ -39,16 +38,16 @@ export const DEFAULT_RANDOM: RandomSource = new MathRandom();
 
 /**
  * The budget policy parameters, as defined by
- * [Budget policy](../../specs/event-system.spec.md#budget-policy). All
+ * [Budget policy](../../specs/constrained-agent.spec.md#budget). All
  * parameters must have defined values; an implementation must not leave any
  * undefined, as required by
- * [Policy parameters](../../specs/event-system.spec.md#policy-parameters).
+ * [Policy parameters](../../specs/constrained-agent.spec.md#policy-parameters).
  *
  * The probabilistic overspend gate is fully determined by the budget base and
  * the current pressure; it introduces no additional policy parameter. The
  * gate's randomness is provided by {@link BudgetPolicy.random}, which is
  * injectable so the gate is deterministic and testable, as required by
- * [Policy parameters](../../specs/event-system.spec.md#policy-parameters).
+ * [Policy parameters](../../specs/constrained-agent.spec.md#policy-parameters).
  *
  * The default policy ({@link DEFAULT_BUDGET_POLICY}) provides conservative
  * defaults; the host overrides them via configuration, per
@@ -65,7 +64,7 @@ export interface BudgetPolicy {
    * direct address) carry a higher premium than routine events.
    *
    * This is a serialisable form of the premium function defined by
-   * [Budget composition](../../specs/event-system.spec.md#budget-composition):
+   * [Budget composition](../../specs/constrained-agent.spec.md#budget-composition):
    * a map of event types to premium values, summed over the queue. Keeping
    * the premium as data (rather than a function) lets the policy cross
    * `postMessage` to a worker.
@@ -74,7 +73,7 @@ export interface BudgetPolicy {
   /**
    * The costs assigned to tool call types, keyed by tool name. The cost of
    * each tool is included in the tool's definition sent to the model, as
-   * required by [Tool call costs](../../specs/event-system.spec.md#tool-call-costs).
+   * required by [Tool call costs](../../specs/constrained-agent.spec.md#cost-model).
    * A missing entry defaults to 0.
    */
   toolCosts: Record<string, number>;
@@ -90,7 +89,7 @@ export interface BudgetPolicy {
  * override via configuration. The premium function gives a small premium per
  * event, with a larger premium for `direct_address` events (which always
  * trigger a flush and expect a response), as described by
- * [Budget composition](../../specs/event-system.spec.md#budget-composition).
+ * [Budget composition](../../specs/constrained-agent.spec.md#budget-composition).
  */
 export const DEFAULT_BUDGET_POLICY: BudgetPolicy = {
   base: 10,
@@ -100,7 +99,7 @@ export const DEFAULT_BUDGET_POLICY: BudgetPolicy = {
 
 /**
  * The logistic sigmoid, $\sigma(x) = 1 / (1 + e^{-x})$, used by the probabilistic
- * overspend gate, as defined by [Overspend](../../specs/event-system.spec.md#overspend).
+ * overspend gate, as defined by [Overspend](../../specs/constrained-agent.spec.md#overspend).
  */
 export function sigmoid(x: number): number {
   return 1 / (1 + Math.exp(-x));
@@ -108,7 +107,7 @@ export function sigmoid(x: number): number {
 
 /**
  * The probability that a proposed overspend is permitted, as defined by
- * [Overspend](../../specs/event-system.spec.md#overspend):
+ * [Overspend](../../specs/constrained-agent.spec.md#overspend):
  *
  * $$\text{probability\_allowed} = \sigma\!\left(1 - \frac{\lfloor p/2 \rfloor + o}{b}\right)$$
  *
@@ -133,8 +132,8 @@ export function overspendProbability(
 
 /**
  * Tracks carryover and pressure across interactions, as defined by
- * [Carryover](../../specs/event-system.spec.md#carryover) and
- * [Pressure](../../specs/event-system.spec.md#pressure).
+ * [Carryover](../../specs/constrained-agent.spec.md#carryover) and
+ * [Pressure](../../specs/constrained-agent.spec.md#pressure).
  *
  * One tracker is shared across the Guide's lifetime. After each interaction,
  * the host reports the budget and cost consumed; the tracker computes the
@@ -163,7 +162,7 @@ export class BudgetTracker {
   /**
    * Compute the budget for an interaction, given the events in the flushed
    * queue. The budget is `base + premium + carryover`, as defined by
-   * [Budget composition](../../specs/event-system.spec.md#budget-composition).
+   * [Budget composition](../../specs/constrained-agent.spec.md#budget-composition).
    */
   budgetFor(events: GuideEvent[]): number {
     const premium = events.reduce((sum, e) => sum + (this.policy.premium[e.type] ?? 0), 0);
@@ -176,12 +175,12 @@ export class BudgetTracker {
    * The carryover is `min(spent, remaining)`, where `remaining = budget -
    * spent`; it peaks at half-budget and is zero both when the Guide declines to
    * act and at full spend, and negative on overspend, as defined by
-   * [Carryover](../../specs/event-system.spec.md#carryover).
+   * [Carryover](../../specs/constrained-agent.spec.md#carryover).
    *
    * Pressure is updated as `max(0, floor(p/2) - min(0, remaining))`: halved on
    * frugal/at-budget interactions, grown by the overspend amount on overspent
    * interactions, clamped to be non-negative, as defined by
-   * [Pressure](../../specs/event-system.spec.md#pressure).
+   * [Pressure](../../specs/constrained-agent.spec.md#pressure).
    *
    * @param budget - the budget for the interaction.
    * @param consumed - the cumulative cost consumed during the interaction.
@@ -209,7 +208,7 @@ export type DispatchAttempt = 'ok' | 'denied';
  * across all turns. Turns are not counted toward the budget; only tool call
  * costs are. A tool call that would exceed the budget is subject to the
  * probabilistic overspend gate, as defined by
- * [Overspend](../../specs/event-system.spec.md#overspend): if the gate roll
+ * [Overspend](../../specs/constrained-agent.spec.md#overspend): if the gate roll
  * succeeds the call is dispatched and its cost consumed; if the roll fails the
  * call is denied, becomes undispatched, and ends the interaction via
  * exhaustion.
@@ -268,7 +267,7 @@ export class InteractionBudget {
    * Attempt to dispatch a tool call of the given cost. A call that fits within
    * the remaining budget is always permitted. A call that would exceed the
    * budget (an overspend) is subject to the probabilistic overspend gate, as
-   * defined by [Overspend](../../specs/event-system.spec.md#overspend): if the
+   * defined by [Overspend](../../specs/constrained-agent.spec.md#overspend): if the
    * roll succeeds the call is permitted (`'ok'`); if it fails the call is
    * denied (`'denied'`), marking the budget exhausted.
    *

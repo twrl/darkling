@@ -20,9 +20,9 @@ The user chose to build wiring and UI in parallel rather than sequentially. The 
 
 The user chose Vite's native Web Worker support (`new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })`). Vite handles bundling worker entry points; no extra config. Matches the existing service-bus `createWorkerTransport` pattern, which takes a `Worker` or `MessagePort`.
 
-### Event system on the main thread
+### Agentic model event queue on the main thread
 
-The event queue and per-event probabilistic flush policy run on the main thread (the UI produces events, the event system triggers interactions), per `event-system.spec.md`. The event queue is a main-thread module that the UI feeds; when a flush occurs, it calls the Guide service's `runInteraction` via the bus. The Guide worker consumes the flushed queue.
+The event queue and per-event probabilistic flush policy run on the main thread (the UI produces events, the agentic model triggers interactions), per `constrained-agent.spec.md` (formerly `event-system.spec.md`, now consolidated into the constrained-agent spec). The event queue is a main-thread module that the UI feeds; when a flush occurs, it calls the Guide service's `runInteraction` via the bus. The Guide worker consumes the flushed queue.
 
 ### Tools registered on the bus from the main thread
 

@@ -2,7 +2,7 @@
  * The Guide's constrained-agent loop.
  *
  * An interaction begins when triggered by a flush of the event queue, as
- * defined by [Interaction triggering](../../specs/event-system.spec.md#interaction-triggering).
+ * defined by [Interaction triggering](../../specs/constrained-agent.spec.md#interaction-triggering).
  * The loop receives the flushed event queue and the current status, invokes
  * the model turn by turn, dispatches tool calls in parallel, enforces the
  * budget, handles FINISHED and exhaustion, and reports the outcome.
@@ -292,7 +292,7 @@ export class AgentLoop {
       if (budget.attemptDispatch(cost) === 'denied') {
         // The overspend gate denied the call: it becomes undispatched and
         // marks the budget exhausted, ending the interaction, as defined by
-        // [Overspend](../../specs/event-system.spec.md#overspend) and
+        // [Overspend](../../specs/constrained-agent.spec.md#overspend) and
         // [Exhaustion](../../specs/constrained-agent.spec.md#exhaustion).
         results.push({
           callId: call.callId,
@@ -364,7 +364,7 @@ export class AgentLoop {
    * Look up the cost of a tool call. The cost comes from the policy's
    * `toolCosts` table, falling back to the tool declaration's cost, then to
    * 0, as defined by
-   * [Tool call costs](../../specs/event-system.spec.md#tool-call-costs).
+   * [Tool call costs](../../specs/constrained-agent.spec.md#cost-model).
    */
   private lookupCost(name: string, decl: { cost: number } | undefined): number {
     const policyCost = this.policy.toolCosts[name];

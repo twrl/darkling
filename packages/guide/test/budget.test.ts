@@ -2,7 +2,7 @@
  * Tests for the revised budget policy: `min(spent, remaining)` carryover,
  * non-negative decaying pressure, and the probabilistic overspend gate.
  *
- * @see specs/event-system.spec.md#budget-policy
+ * @see specs/constrained-agent.spec.md#budget
  */
 
 import { describe, it, expect } from 'vitest';

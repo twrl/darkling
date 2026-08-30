@@ -266,7 +266,7 @@ export class OpenRouterLlmProvider implements LlmProvider {
   /**
    * Render the event queue as a user message. The events describe the User's
    * activity that triggered this interaction, as defined by
-   * [Event system](../../specs/event-system.spec.md#events).
+   * [Constrained agent](../../specs/constrained-agent.spec.md#events).
    */
   private userMessage(input: InteractionInput): string {
     const events = input.eventQueue.map((e) => ({

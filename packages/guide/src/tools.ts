@@ -32,7 +32,7 @@ const PERMITTED_CATEGORIES: readonly ToolCategory[] = [
  *
  * The cost represents the resource expenditure of dispatching the tool call
  * and is consumed against the interaction's budget, as defined by
- * [Tool call costs](../../specs/event-system.spec.md#tool-call-costs). The
+ * [Tool call costs](../../specs/constrained-agent.spec.md#cost-model). The
  * cost and description are included in the tool's definition sent to the
  * model as part of the system prompt, making costs visible to the model at
  * decision time.

@@ -8,10 +8,10 @@ It governs:
 
 - the app's structural contract — the modules, the worker entry points, and the bootstrap sequence;
 - the worker topology — the broker, Guide, and retrieval workers, their registration, and the main-thread host elements;
-- the event system — the UI event queue, the per-event probabilistic flush policy, and interaction triggering, as defined by [Event system](../../specs/event-system.spec.md);
+- the agentic model — the UI event queue, the per-event probabilistic flush policy, and interaction triggering, as defined by [Constrained agent](../../specs/constrained-agent.spec.md);
 - the UI — the 3D scene, the tablet stack, the Guide's avatar, the non-document tablets, the address input, and the high-level semantic event production, as defined by [User interface](../../specs/ui.spec.md);
 - the UI-control and avatar-interaction tools — the `navigate`, `draw_attention`, `speak`, `set_avatar_position`, `set_avatar_visibility`, and `animate_avatar` tools registered on the bus, as defined by [User interface](../../specs/ui.spec.md);
-- the conformance of the app to [Usage and deployment](../../specs/usage-and-deployment.spec.md), [Event system](../../specs/event-system.spec.md), [Constrained agent](../../specs/constrained-agent.spec.md), [User interface](../../specs/ui.spec.md), and [State manager](../../specs/state-manager.spec.md).
+- the conformance of the app to [Usage and deployment](../../specs/usage-and-deployment.spec.md), [Constrained agent](../../specs/constrained-agent.spec.md), [User interface](../../specs/ui.spec.md), and [State manager](../../specs/state-manager.spec.md).
 
 It is explicitly out of scope for this specification to define:
 
@@ -43,7 +43,7 @@ The app is organised into the following modules:
 - `src/workers/guide-service.ts` — the frontend Guide service implementation (`FrontendGuideService`): constructs the loop's `HttpLlmProvider`, `ToolRegistry` (agent-self tools), and `BudgetTracker` from serialisable config carried across the worker boundary via the service registration's `options` bag, then delegates to `@darkling/guide`'s `GuideService`.
 - `src/workers/retrieval-declaration.ts` — re-exports the knowledge-base retrieval service declaration.
 - `src/workers/state-manager-declaration.ts` — re-exports the state-manager service declaration.
-- `src/events/event-queue.ts` — the event queue and per-event probabilistic flush policy, as defined by [Event system](../../specs/event-system.spec.md).
+- `src/events/event-queue.ts` — the event queue and per-event probabilistic flush policy, as defined by [Constrained agent](../../specs/constrained-agent.spec.md#flush-policy).
 - `src/events/event-types.ts` — the high-level semantic event types and payloads, as defined by [User interface](../../specs/ui.spec.md#events).
 - `src/tools/ui-control-tools.ts` — the `navigate` and `draw_attention` tools, as defined by [User interface](../../specs/ui.spec.md#ui-control-tools).
 - `src/tools/avatar-tools.ts` — the `speak`, `set_avatar_position`, `set_avatar_visibility`, and `animate_avatar` tools, as defined by [User interface](../../specs/ui.spec.md#avatar-interaction-tools).

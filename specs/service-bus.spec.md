@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-This specification defines the service bus: the communication substrate by which services running across Web Workers are activated on demand and invoked through message passing. The service bus is the execution layer over which the Guide's tool calls are dispatched, the event system operates, and the retrieval interface is accessed.
+This specification defines the service bus: the communication substrate by which services running across Web Workers are activated on demand and invoked through message passing. The service bus is the execution layer over which the Guide's tool calls are dispatched, the agentic model operates, and the retrieval interface is accessed.
 
 It governs:
 
@@ -17,8 +17,7 @@ It governs:
 It is explicitly out of scope for this specification to define:
 
 - the specific services that run on the bus (retrieval, UI control, avatar interaction, etc.) — which are defined by their respective domain specifications;
-- the constrained agent's tool-call discipline, tool categories, and budget — which are defined by [Constrained agent](./constrained-agent.spec.md);
-- the event system — which is defined by [Event system](./event-system.spec.md);
+- the constrained agent — including the agentic model, tool-call discipline, tool categories, and budget — which is defined by [Constrained agent](./constrained-agent.spec.md);
 - the content model and retrieval interface — which are defined by [Content model](./content-model.spec.md) and [Content-first retrieval](./content-first-retrieval.spec.md).
 
 Where this specification depends on behaviour defined by those specifications, it links to them and states its requirement in terms of their observable behaviour.
@@ -307,7 +306,7 @@ The service bus is the execution substrate for several other specifications:
 
 - **Tool call dispatch** — the Guide's tool calls, as defined by [Constrained agent](./constrained-agent.spec.md), are dispatched through the service bus. Each tool category (avatar interaction, UI control, knowledge base access, agent self) is backed by services on the bus. Parallel dispatch of tool calls within a turn, as required by the constrained agent spec, is supported by the concurrent execution of service hosts in separate workers.
 - **Retrieval** — the retrieval interface, as defined by [Content-first retrieval](./content-first-retrieval.spec.md), is accessed through services on the bus. The block store, property index, text index, relationship index, and containment index are backed by services.
-- **Event system** — the event system, as defined by [Event system](./event-system.spec.md), produces and queues events. Event production and queue management may be implemented as services on the bus.
+- **Agentic model** — the agentic model (events, queue, flush, interaction triggering, budget), as defined by [Constrained agent](./constrained-agent.spec.md), produces and queues events and triggers interactions. Event production and queue management may be implemented as services on the bus.
 
 This specification defines the bus; the specific services are defined by their respective domain specifications.
 

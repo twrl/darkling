@@ -7,7 +7,6 @@
  * calls, and the `safety_consult` agent-self tool.
  *
  * @see specs/constrained-agent.spec.md
- * @see specs/event-system.spec.md
  * @see specs/three-way-interaction.spec.md
  * @see specs/agent-safety.spec.md
  */

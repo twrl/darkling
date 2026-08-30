@@ -27,11 +27,13 @@ When those specifications are established, this journal should be updated to con
 
 ### Update: event system spec established
 
-The event system has been established as [event-system.spec.md](./event-system.spec.md). It defines the event queue, microbatching, the hybrid immediate/probabilistic flush policy, probabilistic interaction triggering, and budget policy (amount, tool call costs, overspend, carryover). This resolves several dependencies:
+The event system was established as [event-system.spec.md](./event-system.spec.md). It defined the event queue, microbatching, the per-event probabilistic flush policy, probabilistic interaction triggering, and budget policy (amount, tool call costs, overspend, carryover). This resolved several dependencies:
 
-- The trigger mechanism is the flush policy: an interaction is triggered when the event queue is flushed (immediately or probabilistically).
-- The budget policy (amount, costs, overspend, carryover) is owned by the event system spec, as anticipated by this spec's references. The constrained agent spec defines the mechanism; the event system spec defines the policy values.
+- The trigger mechanism is the flush policy: an interaction is triggered when the event queue is flushed.
+- The budget policy (amount, costs, overspend, carryover) was owned by the event system spec, as anticipated by this spec's references. The constrained agent spec defined the mechanism; the event system spec defined the policy values.
 - The apparent-spontaneity mechanism is the probabilistic flush, consistent with this spec's requirement that triggering is probabilistic.
+
+> **Note:** The event-system spec has since been consolidated into this specification; see the [Consolidation](#consolidation-event-system-merged-into-the-constrained-agent) section below. The historical narrative in this and the preceding sections reflects the state prior to consolidation.
 
 The interaction precedence gap (what happens if an interaction is in progress when a flush occurs) remains open and is recorded in both journals.
 
@@ -124,10 +126,51 @@ The spec requires that a budget exists and bounds both reasoning and tool calls,
 ## Gaps and ambiguities
 
 - **Specific tool definitions.** The spec defines the four tool categories and the `update_working_memory` tool. All other specific tools (avatar interaction, UI control, knowledge base access) are deferred to their respective domain specifications.
-- **Budget value, cost assignment, and configurability.** The spec requires a cost-based budget exists but does not prescribe the budget amount, the cost assigned to each tool call type, or whether these are configurable. Deferred to the event system spec or implementation.
-- **Overspend and carryover policies.** The spec requires these mechanisms exist but does not define the specific policies. Deferred to the event system spec or a dedicated policy spec.
-- **Interaction trigger details.** The spec states that an interaction begins when triggered by an event, and that triggering is probabilistic, but the trigger mechanism and probabilities are owned by the event system spec. The boundary between "trigger" (event system) and "interaction" (this spec) should be confirmed when the event system spec is established.
 - **Multiple avatar interaction calls.** The spec does not define whether multiple avatar interaction calls within one interaction are permitted and how they are presented to the User. This may need clarification in the relevant domain spec.
-- **Status object fields.** The spec requires the status object to include the budget, working memory, and undispatched tool calls, and permits additional fields. The full status object shape is not defined and may be shared across the event system and other specs.
+- **Status object fields.** The spec requires the status object to include the budget, working memory, and undispatched tool calls, and permits additional fields. The full status object shape is not defined and may be further specified by other specs.
 - **Working memory size and validation.** The spec defines working memory as an arbitrary JSON value with no size limit or schema. Implementation may need to impose limits; this is left to implementation for now.
 - **Working memory reset policy.** The spec states working memory persists until replaced but does not define whether/when it is reset (e.g. on session start, on Guide reset). Left to implementation.
+
+## Consolidation: event system merged into the constrained agent
+
+Via the specification workflow, the [Event system](./event-system.spec.md) specification was consolidated into this specification. The event system spec is retired; it is retained as a redirect to this spec. The consolidation was driven by the observation that the event queue, flush policy, interaction triggering, and budget semantics are all part of the agentic model — they are the mechanism by which the Guide is driven and bounded — and the former split across two specs produced a circular dependency (the agentic model lived in the constrained agent spec but its core mechanics lived in the event system spec, and each constantly cross-referenced the other).
+
+Through dialogue with the user, the following scope decisions were made:
+
+- **Merge into one spec.** The constrained agent spec now owns the full agentic model: events, queue, flush, triggering, budget, tool discipline, working memory, FINISHED. The event-system spec is retired. The event-system journal is retained as a historical record with a pointer to this consolidation.
+- **Event structure moves into the constrained agent spec.** The event structure (type/timestamp/payload, immutability, event sources) is part of the agentic model since events are its input. The UI spec continues to own only the vocabulary of event types and their payloads.
+- **Policy parameters stay co-located.** The policy parameters table (trigger probabilities, budget base, premium function, tool call costs) remains in the spec that owns the behaviour it governs — now the consolidated constrained agent spec, rather than a separate event-system spec. The cross-cutting policy contract is still established by [Policy and configuration](./policy-and-configuration.spec.md).
+
+### What moved
+
+The following sections, formerly in event-system.spec.md, are now sections of this spec:
+
+| Former event-system section | New section in this spec |
+| --- | --- |
+| Events (high-level semantic events, event structure, event sources) | [Events](./constrained-agent.spec.md#events) |
+| Event queue (queue, queue lifecycle) | [Event queue](./constrained-agent.spec.md#event-queue) |
+| Flush policy (per-event roll, trigger probability, microbatching, apparent spontaneity, Gherkin) | [Flush policy](./constrained-agent.spec.md#flush-policy) |
+| Interaction triggering | [Interaction triggering](./constrained-agent.spec.md#interaction-triggering) |
+| Budget policy (composition, tool call costs, overspend, pressure, carryover, Gherkin) | [Budget](./constrained-agent.spec.md#budget) (merged with the former budget mechanism sections) |
+| Policy parameters | [Policy parameters](./constrained-agent.spec.md#policy-parameters) |
+
+### What changed in the constrained agent spec
+
+- The **Purpose and scope** section now states that the event queue, flush policy, interaction triggering, and budget semantics are part of the agentic model, and lists them among the governed concerns. The explicit out-of-scope item for the event system is removed; a new out-of-scope item for the UI event vocabulary is added.
+- The **Agentic model** section formerly restated the event queue and probabilistic triggering, deferring to the event system spec for the mechanism. Those restatements are removed; the full mechanism now lives earlier in the spec (Events, Event queue, Flush policy, Interaction triggering), and the Agentic model section focuses on interaction input, model output, and turns.
+- The **Budget** section formerly split mechanism (cost model, exhaustion, undispatched calls) from policy (composition, overspend, pressure, carryover), deferring the policy to the event system spec. The two are now unified: the Budget section owns both the mechanism and the policy. The "defined by policy as established by Event system" and "out of scope for this specification" disclaimers are removed; the specific costs are now policy parameters defined in [Policy parameters](#policy-parameters).
+- The **Interaction triggering** section gains an explicit statement that at most one interaction is in progress at any time (formerly in the event-system queue lifecycle, and recorded in this journal as resolving the interaction precedence gap).
+- The **Policy parameters** section gains a link to [Policy and configuration](./policy-and-configuration.spec.md) for the cross-cutting contract, replacing the former standalone preamble.
+- Former cross-references to `./event-system.spec.md#...` throughout the spec are updated to internal references or removed as appropriate.
+
+### Resolved gaps
+
+Several gaps recorded in this journal are resolved by the consolidation:
+
+- **Budget value, cost assignment, and configurability** — formerly "deferred to the event system spec or implementation." The budget policy now lives in this spec; the specific values are policy parameters defined in [Policy parameters](#policy-parameters), with the cross-cutting configurability contract established by [Policy and configuration](./policy-and-configuration.spec.md).
+- **Overspend and carryover policies** — formerly "deferred to the event system spec or a dedicated policy spec." The full overspend gate, pressure, and carryover mechanisms now live in the [Budget](#budget) section of this spec.
+- **Interaction trigger details** — formerly "owned by the event system spec; the boundary between trigger (event system) and interaction (this spec) should be confirmed." The trigger mechanism (flush policy) and the interaction model are now in the same spec; the boundary is dissolved.
+
+### Spec consistency
+
+All specifications that formerly linked to `event-system.spec.md` have been updated to link to the corresponding sections of `constrained-agent.spec.md`. The event-system spec is retained as a redirect with a section-mapping table for any external references. The policy-and-configuration spec's references to "Event system" as the owner of budget and flush policy parameters are updated to reference the constrained agent spec. No normative requirements have been changed by the consolidation; the content is reorganised, not altered, except for the removal of the now-redundant cross-references and deferral disclaimers.

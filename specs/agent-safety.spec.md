@@ -40,7 +40,7 @@ The `safety_consult` tool is a tool in the [Agent self](./constrained-agent.spec
 - **Parameters** — the content or proposed action the Guide wants assessed, together with sufficient context for the consultant to evaluate it (e.g. the proposed response text, the current interaction context).
 - **Return** — the consultant's advice, structured as defined in [Tiered advice](#tiered-advice).
 - **Effect** — none on the Archive, the UI, or the User's experience. The call is internal to the Guide's reasoning, like other agent self tools. The User does not see that a safety consult occurred.
-- **Cost** — the `safety_consult` tool call has a cost, as defined by [Event system](./event-system.spec.md). The cost counts against the interaction's budget, like any other tool call. This means the Guide must weigh the cost of consulting against its remaining budget.
+- **Cost** — the `safety_consult` tool call has a cost, as defined by [Constrained agent](./constrained-agent.spec.md#cost-model). The cost counts against the interaction's budget, like any other tool call. This means the Guide must weigh the cost of consulting against its remaining budget.
 
 The Guide may call `safety_consult` at any point in an interaction, before issuing a response or other tool call that it is uncertain about.
 
@@ -153,7 +153,7 @@ The `safety_consult` tool call consumes budget, like any other tool call. This h
 
 - the Guide must weigh the cost of consulting against its remaining budget;
 - if the budget is exhausted before the Guide consults, the consultation does not occur, and the Guide must rely on its prompt-level safety guidance;
-- the cost of `safety_consult` should be set to encourage consultation when warranted without making it prohibitive. The specific cost is a policy parameter, as defined by [Event system](./event-system.spec.md).
+- the cost of `safety_consult` should be set to encourage consultation when warranted without making it prohibitive. The specific cost is a policy parameter, as defined by [Constrained agent](./constrained-agent.spec.md#policy-parameters).
 
 ## Relationship to working memory
 

@@ -4,7 +4,7 @@ This journal records the development of [usage-and-deployment.spec.md](./usage-a
 
 ## Origin
 
-Created in response to a user observation that "one area which we haven't discussed, and which might clarify some things, is how we expect/intend this software to be used." The existing specifications are rich on internal architecture (service bus, event system, constrained agent, content model) but thin on deployment, runtime topology, session model, and how the pieces run together. Established via the specification workflow.
+Created in response to a user observation that "one area which we haven't discussed, and which might clarify some things, is how we expect/intend this software to be used." The existing specifications are rich on internal architecture (service bus, constrained agent, content model) but thin on deployment, runtime topology, session model, and how the pieces run together. Established via the specification workflow.
 
 ## Scope decisions
 
@@ -61,8 +61,7 @@ Retrieval and IndexedDB cache management run in a Web Worker so that cache reads
 ## Affected specifications reviewed
 
 - [Service bus](./service-bus.spec.md) — the bus runs on the frontend across Web Workers; the backend is not on the bus. Consistent with the service-bus spec's worker topology. No contradiction.
-- [Event system](./event-system.spec.md) — the event queue and flush policy run on the frontend. Consistent; events are produced by the UI and consumed by the Guide, both client-side. No contradiction.
-- [Constrained agent](./constrained-agent.spec.md) — the Guide's agent loop runs in a worker on the frontend; LLM calls are proxied through the backend. Working memory persistence (cross-visit, IndexedDB) resolves the "implementation policy" gap noted in the constrained agent spec and journal. No contradiction.
+- [Constrained agent](./constrained-agent.spec.md) — the agentic model (event queue, flush policy, interaction triggering, budget) and the Guide's agent loop run on the frontend; events are produced by the UI and consumed by the Guide, both client-side. LLM calls are proxied through the backend. Working memory persistence (cross-visit, IndexedDB) resolves the "implementation policy" gap noted in the constrained agent spec and journal. No contradiction. (The former event system spec, separately referenced here prior to consolidation, has been merged into the constrained agent spec.)
 - [Content model](./content-model.spec.md) — the compiled model is produced by the backend and stored in the persistent store. Consistent; the content model spec governs the model's structure, not where it lives. No contradiction.
 - [Content-first retrieval](./content-first-retrieval.spec.md) — retrieval executes on the backend (querying the persistent store); the frontend caches in IndexedDB. The per-index provider interfaces are the abstraction boundary. Consistent; the retrieval spec defines the interface, not where it executes. No contradiction.
 - [Authoring tooling](./authoring-tooling.spec.md) — the backend compiles source Markdown from an external git repository on webhook. Consistent with the authoring-tooling spec's content-sources and recompilation-trigger sections. No contradiction.

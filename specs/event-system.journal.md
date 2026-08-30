@@ -2,6 +2,8 @@
 
 This journal records the development of [event-system.spec.md](./event-system.spec.md). It is non-normative; the specification takes precedence.
 
+> **Retired.** The event-system specification has been consolidated into [Constrained agent](./constrained-agent.spec.md); see the [Consolidation](./constrained-agent.journal.md#consolidation-event-system-merged-into-the-constrained-agent) section of the constrained-agent journal for the scope decisions, section mapping, and consistency review. This journal is retained as a historical record; the event-system spec itself is retained as a redirect. The content below reflects the state of the event-system spec prior to consolidation and is not maintained further.
+
 ## Origin
 
 Created as the fourth specification, in response to a request to establish the event system spec referenced by both the three-way interaction and constrained agent specs. Established via the specification workflow.

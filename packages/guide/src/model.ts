@@ -10,7 +10,7 @@
 
 /**
  * A high-level semantic event produced by the UI, as defined by
- * [Event system](../../specs/event-system.spec.md#events).
+ * [Constrained agent](../../specs/constrained-agent.spec.md#events).
  *
  * The event structure (type, timestamp, payload) is owned by the event system
  * spec. The Guide's agent loop consumes events as part of the interaction

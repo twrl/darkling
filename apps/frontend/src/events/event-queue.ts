@@ -1,9 +1,9 @@
 /**
  * The event queue and per-event probabilistic flush policy, as defined by
- * [Event system](../../specs/event-system.spec.md).
+ * [Constrained agent](../../specs/constrained-agent.spec.md#events).
  *
- * @see specs/event-system.spec.md#event-queue
- * @see specs/event-system.spec.md#flush-policy
+ * @see specs/constrained-agent.spec.md#event-queue
+ * @see specs/constrained-agent.spec.md#flush-policy
  */
 
 import type { UIEvent, EventType } from './event-types.js';
@@ -35,7 +35,7 @@ export const defaultRandom: RandomSource = {
 
 /**
  * The event queue: accumulates events and flushes them per the per-event
- * probabilistic flush policy, as defined by [Event system](../../specs/event-system.spec.md).
+ * probabilistic flush policy, as defined by [Constrained agent](../../specs/constrained-agent.spec.md#events).
  *
  * When a flush occurs, the `onFlush` callback is called with the flushed
  * events. Events that are sent to the model are consumed (removed from the

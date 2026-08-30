@@ -36,7 +36,7 @@ const log = createLogger('guide:provider');
 /**
  * The request sent to the LLM provider for a turn: the interaction input, the
  * tool definitions (with costs, so the model can weigh cost against remaining
- * budget, as required by [Tool call costs](../../specs/event-system.spec.md#tool-call-costs)),
+ * budget, as required by [Tool call costs](../../specs/constrained-agent.spec.md#cost-model)),
  * and the tool results from the previous turn (for subsequent turns).
  */
 export interface LlmTurnRequest {

@@ -3,7 +3,7 @@
  * defined by [User interface](../../specs/ui.spec.md#events).
  *
  * @see specs/ui.spec.md#events
- * @see specs/event-system.spec.md#event-structure
+ * @see specs/constrained-agent.spec.md#event-structure
  */
 
 import { z } from 'zod';

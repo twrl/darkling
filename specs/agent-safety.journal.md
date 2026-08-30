@@ -50,7 +50,7 @@ This preserves the Guide's autonomy and avoids adding a fixed cost to every inte
 
 ### Budget cost encourages judicious use
 
-The `safety_consult` tool call consumes budget. This means the Guide must weigh the cost of consulting against its remaining budget. If the budget is exhausted, the consultation doesn't occur, and the Guide falls back on its prompt-level safety guidance. The cost should be set to encourage consultation when warranted without making it prohibitive — a policy parameter owned by the event system spec.
+The `safety_consult` tool call consumes budget. This means the Guide must weigh the cost of consulting against its remaining budget. If the budget is exhausted, the consultation doesn't occur, and the Guide falls back on its prompt-level safety guidance. The cost should be set to encourage consultation when warranted without being prohibitive — a policy parameter owned by the constrained agent spec (formerly the event system spec, now consolidated into it).
 
 ### Consultant has no access to working memory
 
@@ -60,18 +60,17 @@ Each consultation is assessed based on the content and context provided in the `
 
 This specification references:
 
-- [Constrained agent](./constrained-agent.spec.md) — for the agent self tool category, tool-call discipline, budget, and working memory.
-- [Event system](./event-system.spec.md) — for the budget policy and tool call cost assignment.
+- [Constrained agent](./constrained-agent.spec.md) — for the agent self tool category, tool-call discipline, budget, and working memory. (The event system spec, formerly referenced separately for budget policy and tool call cost assignment, has been consolidated into the constrained agent spec.)
 - [Service bus](./service-bus.spec.md) — for the dispatch of the `safety_consult` call to the consultant service.
 - [Three-way interaction](./three-way-interaction.spec.md) — for the Guide's in-character behaviour and the User's experience.
 
-All referenced specifications are established. The `safety_consult` tool should be added to the constrained agent spec's agent self category description when that spec is next revised, or the constrained agent spec's reference to "other tools that affect the Guide's own state" in the agent self category should be understood to include `safety_consult`.
+All referenced specifications are established. The `safety_consult` tool is now listed in the constrained agent spec's agent self category alongside `update_working_memory`.
 
 ## Gaps and ambiguities
 
 - **Safety policies.** The spec does not define the specific safety policies or content guidelines the consultant enforces. These are an implementation and policy concern, appropriate for configuration rather than specification.
 - **Consultant prompt.** The spec does not define the consultant's prompt or system prompt. This is an implementation detail.
-- **Cost of safety_consult.** The spec states the cost should encourage consultation without being prohibitive, but the specific cost is a policy parameter owned by the event system spec.
+- **Cost of safety_consult.** The spec states the cost should encourage consultation without being prohibitive, but the specific cost is a policy parameter owned by the constrained agent spec.
 - **Veto enforcement.** The spec states the Guide must not produce vetoed content, but does not define a mechanism for enforcing this at the system level (e.g. post-hoc content checking). Enforcement relies on the Guide's prompt and the binding nature of the veto. A system-level enforcement mechanism may be warranted.
 - **Consultant availability.** The spec does not address what happens if the consultant service is unavailable (e.g. host failure). The service bus's error propagation would cause the `safety_consult` call to reject, but the Guide's behaviour in this case is not specified.
 - **Multiple consultations.** The spec does not address whether the Guide may call `safety_consult` multiple times in a single interaction (e.g. consulting on different proposed responses). This is permitted by the tool-call model but not explicitly stated.
