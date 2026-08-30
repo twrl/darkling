@@ -16,7 +16,7 @@ It governs:
 
 It is explicitly out of scope for this specification to define:
 
-- the internal behaviour of the subsystems — the service bus, constrained agent, content model, retrieval, annotations, and policy and configuration — which are defined by their respective specifications;
+- the internal behaviour of the subsystems — the runtime, constrained agent, content model, retrieval, annotations, and policy and configuration — which are defined by their respective specifications;
 - the specific LLM provider or its API — which is a configuration choice, as defined in [LLM provider abstraction](#llm-provider-abstraction);
 - the specific persistent store technology (e.g. Upstash, Redis) — which is an implementation concern;
 - the authoring format and compilation pipeline internals — which are defined by [Authoring tooling](./authoring-tooling.spec.md).
@@ -131,7 +131,7 @@ The frontend runs across the main thread and Web Workers. Each subsystem runs wh
 
 The UI runs on the main thread: Lit components, rendering, and event production. UI logic must not run in a worker. Animation may use `OffscreenCanvas` in a worker where appropriate, but general UI logic remains on the main thread.
 
-The service bus's support for Transferable objects, as defined by [Service bus](./service-bus.spec.md#transferable-objects), is intended to support the transfer of frame and canvas data (e.g. `OffscreenCanvas` frames for UI rendering) between workers and the main thread without copying. This is a general UI rendering concern; the specific rendering pipeline is defined by the UI specification.
+The runtime's support for Transferable objects, as defined by [Runtime](./runtime.spec.md#transferable-objects), is intended to support the transfer of frame and canvas data (e.g. `OffscreenCanvas` frames for UI rendering) between workers and the main thread without copying. This is a general UI rendering concern; the specific rendering pipeline is defined by the UI specification.
 
 ### Service Worker
 
@@ -141,15 +141,16 @@ The Service Worker keeps token handling entirely out of the application code and
 
 ### Web Workers
 
-Three subsystems run in dedicated Web Workers, as established by their respective specifications:
+The runtime broker runs in a dedicated Web Worker, as defined by [Runtime](./runtime.spec.md). The broker hosts colocated services (including the state authority) in its local host, and manages remote service host workers on demand. Heavy or long-running services run in dedicated service host workers, isolated from the broker and from each other, so they cannot block coordination or starve other services. Whether a given service is heavy enough to require its own worker is determined by its declaration metadata and the broker's placement policy, as defined by [Runtime](./runtime.spec.md#on-demand-activation).
 
-- **Service bus broker** — runs in a dedicated Web Worker, routing calls between the Guide, retrieval, and other services, as defined by [Service bus](./service-bus.spec.md).
-- **Guide agent loop** — the constrained-agent loop (reasoning, tool dispatch, budget enforcement, event consumption) runs in a dedicated Web Worker, isolated from the main thread, as defined by [Constrained agent](./constrained-agent.spec.md). The Guide's LLM calls are proxied through the backend, as defined in [LLM proxy](#llm-proxy).
-- **Retrieval and cache** — the retrieval service runs on the frontend's service bus in a Web Worker, as defined by [Service bus](./service-bus.spec.md). Its store and index providers are HTTP-client backends that call the backend over HTTP, and it manages the IndexedDB cache and prefetch, as defined in [Client-side retrieval and caching](#client-side-retrieval-and-caching). Keeping cache I/O off the main thread prevents retrieval and IndexedDB operations from blocking the UI.
+Examples of services that require dedicated service host workers include:
+
+- **Guide agent loop** — the constrained-agent loop (reasoning, tool dispatch, budget enforcement, event consumption) runs in a dedicated service host worker, isolated from the main thread, as defined by [Constrained agent](./constrained-agent.spec.md). The Guide's LLM calls are proxied through the backend, as defined in [LLM proxy](#llm-proxy).
+- **Retrieval and cache** — the retrieval service runs in a service host worker, as defined by [Runtime](./runtime.spec.md). Its store and index providers are HTTP-client backends that call the backend over HTTP, and it manages the IndexedDB cache and prefetch, as defined in [Client-side retrieval and caching](#client-side-retrieval-and-caching). Keeping cache I/O off the main thread prevents retrieval and IndexedDB operations from blocking the UI.
 
 ```gherkin
 Feature: Runtime topology
-  Rule: UI on the main thread; Service Worker for tokens; broker, Guide, and retrieval in workers
+  Rule: UI on the main thread; Service Worker for tokens; runtime broker and heavy services in workers
 
   Scenario: UI on the main thread
     Given the frontend is running
@@ -161,15 +162,15 @@ Feature: Runtime topology
     Then the Service Worker must attach the Authorization header
     And the application code must not handle the token directly
 
-  Scenario: Guide agent loop in a worker
-    Given the Guide is active
-    Then the constrained-agent loop must run in a dedicated Web Worker
-    And it must not block the main thread
+  Scenario: Runtime broker in a dedicated worker
+    Given the runtime is active
+    Then the broker must run in a dedicated Web Worker
+    And colocated services (including the state authority) must run in the broker's local host
 
-  Scenario: Retrieval and cache in a worker
-    Given the retrieval service is active
-    Then retrieval queries and IndexedDB cache management must run in a Web Worker
-    And cache I/O must not block the main thread
+  Scenario: Heavy services in dedicated service host workers
+    Given a heavy or long-running service is active
+    Then it must run in a dedicated service host worker
+    And it must not block the broker or the main thread
 ```
 
 ## Content lifecycle
@@ -205,7 +206,7 @@ Feature: Content lifecycle
 
 ## Client-side retrieval and caching
 
-The retrieval service runs on the frontend's service bus, as defined by [Service bus](./service-bus.spec.md) and provided by the `@darkling/knowledge-base` package's service declaration. The Guide retrieves content through the bus, as defined by [Content-first retrieval](./content-first-retrieval.spec.md). The retrieval service's store and index providers are HTTP-client backends that call the backend over HTTP, which queries the persistent store. The retrieval service also maintains a client-side cache with prefetch in IndexedDB, keeping cache I/O off the main thread.
+The retrieval service runs on the frontend's runtime, as defined by [Runtime](./runtime.spec.md) and provided by the `@darkling/knowledge-base` package's service declaration. The Guide retrieves content through the runtime, as defined by [Content-first retrieval](./content-first-retrieval.spec.md). The retrieval service's store and index providers are HTTP-client backends that call the backend over HTTP, which queries the persistent store. The retrieval service also maintains a client-side cache with prefetch in IndexedDB, keeping cache I/O off the main thread.
 
 - **Cache.** The frontend caches retrieved documents and content blocks in IndexedDB. The cache is a client-side optimisation; the backend's persistent store is the source of truth.
 - **Prefetch.** The frontend may prefetch likely-needed content — for example, a document's block tree when the document is opened, or the targets of a block's relationships when the block is retrieved. Prefetch reduces latency for subsequent retrieval calls.
@@ -484,9 +485,9 @@ Feature: Configuration
 On page load, the frontend bootstraps the runtime:
 
 1. The Service Worker activates and obtains a token (exchanging a presented secret or requesting an anonymous token), as defined in [Access and authentication](#access-and-authentication).
-2. The service bus is created and started, with the broker in its Web Worker, as defined by [Service bus](./service-bus.spec.md).
-3. The retrieval/cache worker is started, connecting to the backend over HTTP, opening the IndexedDB cache, and fetching the table of contents, as defined in [Client-side retrieval and caching](#client-side-retrieval-and-caching).
-4. The Guide agent loop worker is started, connecting to the service bus.
+2. The runtime is created and started, with the broker in its Web Worker, as defined by [Runtime](./runtime.spec.md). Services are registered with the broker; the state authority is colocated as a service on the broker's local host.
+3. The retrieval service host worker is started on demand, connecting to the backend over HTTP, opening the IndexedDB cache, and fetching the table of contents, as defined in [Client-side retrieval and caching](#client-side-retrieval-and-caching).
+4. The Guide agent loop service host worker is started on demand, connecting to the runtime.
 5. The UI is mounted on the main thread, producing events as the Visitor interacts.
 6. The UI emits `session_start` (trigger probability 1.0), which flushes the event queue and triggers the Guide's first interaction, as defined by [User interface](./ui.spec.md#session-start). The Guide may greet the Visitor or decline to act (return FINISHED), as permitted by [Constrained agent](./constrained-agent.spec.md#finished).
 7. The Guide begins consuming events and responding, as defined by [Constrained agent](./constrained-agent.spec.md).
@@ -501,9 +502,10 @@ Feature: Bootstrap
     Given the frontend page has loaded
     When the bootstrap runs
     Then the Service Worker must activate and obtain a token
-    And the service bus must be started with the broker in a worker
-    And the retrieval/cache worker must be started and fetch the ToC
-    And the Guide agent loop worker must be started
+    And the runtime must be started with the broker in a worker
+    And services must be registered with the broker
+    And the retrieval service host worker must be started and fetch the ToC
+    And the Guide agent loop service host worker must be started
     And the UI must be mounted on the main thread
     And the UI must emit a session_start event with trigger probability 1.0
     And the session_start event must flush the queue and trigger the Guide's first interaction
@@ -511,7 +513,7 @@ Feature: Bootstrap
 
 ## Relationship to other specifications
 
-- [Service bus](./service-bus.spec.md) — the bus runs on the frontend across Web Workers; the backend is not on the bus. The bus's Transferable object support enables frame and canvas transfer for UI rendering.
+- [Runtime](./runtime.spec.md) — the runtime runs on the frontend across Web Workers; the backend is not on the runtime. The runtime's Transferable object support enables frame and canvas transfer for UI rendering. The state authority is colocated with the broker; heavy services run in dedicated service host workers.
 - [Constrained agent](./constrained-agent.spec.md) — the agentic model (event queue, flush policy, interaction triggering, budget) and the Guide's agent loop run on the frontend; events are produced by the UI and consumed by the Guide. LLM calls are proxied through the backend. Session state persistence (per-tier, configurable) is established here, resolving the "implementation policy" gap noted in the constrained agent spec.
 - [Content model](./content-model.spec.md) — the compiled model is produced by the backend and stored in the persistent store; the frontend retrieves it over HTTP.
 - [Content-first retrieval](./content-first-retrieval.spec.md) — retrieval executes on the backend (querying the persistent store); the frontend caches results in IndexedDB and fetches a table of contents at bootstrap. The per-index provider interfaces are the abstraction boundary.
@@ -524,7 +526,7 @@ Feature: Bootstrap
 
 An implementation conforms to this specification when:
 
-- the frontend is a static build served by the hosting platform, running the UI on the main thread, a Service Worker for transparent token handling, and the service bus broker, Guide agent loop, and retrieval/cache worker in dedicated Web Workers; the service bus's Transferable object support enables frame and canvas transfer for UI rendering between workers and the main thread;
+- the frontend is a static build served by the hosting platform, running the UI on the main thread, a Service Worker for transparent token handling, and the runtime broker (with colocated state authority) and heavy services (Guide agent loop, retrieval/cache) in dedicated Web Workers; the runtime's Transferable object support enables frame and canvas transfer for UI rendering between workers and the main thread;
 - the backend is a serverless application that proxies the LLM (holding the API key, abstracted behind a provider interface) and serves retrieval from a persistent store, reading source Markdown from an external git repository and recompiling on webhook; the backend uses three logical stores — a persistent store (compiled content model and non-secret configuration cache), a secret store (pre-shared secrets), and a usage tracking store (per-session spend and global rate-limit counters) — which may share a physical store;
 - the LLM provider is abstracted behind a provider interface and selected by configuration, swappable without changing the constrained-agent specification or the frontend;
 - the compiled content model is stored in the persistent store and served by the backend over HTTP; the frontend is not shipped the compiled model as a static asset;
@@ -537,4 +539,4 @@ An implementation conforms to this specification when:
 - the backend enforces a per-session spend cap and a global rate limit, tier-dependent (from the token's claims), with the cap hit presented as an in-world rest message;
 - configuration is split between the content repository (content-specific config, versioned with content) and the deployment environment (operational config: repo URL, LLM key, provider, store connections, caps, limits, persistence policies); pre-shared secrets are held in the secret store, not in the deployment environment; both are resolved at startup and cached in the persistent store (except secrets);
 - policy values (spend caps, rate limits, LLM provider, persistence policies) are resolved at startup, as defined by [Policy and configuration](./policy-and-configuration.spec.md#static-resolution);
-- the frontend bootstraps the Service Worker, service bus, retrieval/cache worker (with ToC fetch), Guide agent loop, and UI on page load.
+- the frontend bootstraps the Service Worker, runtime (with broker and colocated state authority), retrieval service host worker (with ToC fetch), Guide agent loop service host worker, and UI on page load.

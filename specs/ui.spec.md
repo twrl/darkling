@@ -12,7 +12,7 @@ It governs:
 - attention — how the Guide's Draw-attention operation is rendered transiently on a content block;
 - the high-level semantic event vocabulary — the controlled set of event types the UI produces and their payloads, owed to [Constrained agent](./constrained-agent.spec.md#events);
 - the interface operations exposed to both the Visitor and the Guide — Navigate and Draw attention, as defined by [Three-way interaction](./three-way-interaction.spec.md#interface-control), and the UI-control tools that back the Guide's invocation of them;
-- the `interface` state slice — its concrete fields and conflict-resolution invariants, as a refinement of [State manager](./state-manager.spec.md#state-model), enforcing the conflict-resolution rules defined by [Three-way interaction](./three-way-interaction.spec.md#conflict-resolution);
+- the `interface` state slice — its concrete fields and conflict-resolution invariants, as a refinement of [Runtime](./runtime.spec.md#slice-declarations), enforcing the conflict-resolution rules defined by [Three-way interaction](./three-way-interaction.spec.md#conflict-resolution);
 - cap-enforcement presentation — the in-world "rest" surface, as required by [Usage and deployment](./usage-and-deployment.spec.md#cap-enforcement).
 
 It is explicitly out of scope for this specification to define:
@@ -24,7 +24,7 @@ It is explicitly out of scope for this specification to define:
 - the retrieval interface — which is defined by [Content-first retrieval](./content-first-retrieval.spec.md);
 - annotations — which are private to the Guide and must not be rendered by the UI, as defined by [Annotations](./annotations.spec.md);
 - the runtime topology — which subsystems run in which workers, the Service Worker, and token handling — which are defined by [Usage and deployment](./usage-and-deployment.spec.md);
-- the state-manager mechanism — the authority, local copies, patch broadcast, and reactivity — which is defined by [State manager](./state-manager.spec.md). This specification refines the `interface` slice's fields and invariants within that mechanism;
+- the runtime's state mechanism — the authority, local copies, state-change propagation, and reactivity — which is defined by [Runtime](./runtime.spec.md). This specification refines the `interface` slice's fields and invariants within that mechanism;
 - the specific persistent store, LLM provider, and deployment platform — which are defined by [Usage and deployment](./usage-and-deployment.spec.md).
 
 Where this specification depends on behaviour defined by those specifications, it links to them and states its requirement in terms of their observable behaviour, without redefining their mechanisms.
@@ -35,7 +35,7 @@ Darkling is an immersive, single-Visitor experience: a person explores an interc
 
 The UI's central design decision is a spatial metaphor: the Archive is presented as a stack of glassy tablets projected above a surface, and the Guide inhabits the same scene as a visible figure that addresses the Visitor and gestures toward the material. This metaphor serves the three-way interaction model defined by [Three-way interaction](./three-way-interaction.spec.md): the Archive is the shared substrate the Visitor and the Guide both act upon, the Guide draws attention to material by acting on the interface, and the Visitor is the principal agent whose actions take precedence.
 
-The UI is a reactive consumer of the shared `interface` state slice defined by [State manager](./state-manager.spec.md). Visitor navigation and the Guide's interface operations are both expressed as proposed updates to the `interface` slice; the slice's invariants enforce the conflict-resolution rules, so the Guide's conflicting actions are rejected at the state level rather than resolved by the UI ad hoc. The UI renders the current `interface` state reactively.
+The UI is a reactive consumer of the shared `interface` state slice defined by [Runtime](./runtime.spec.md#shared-state). Visitor navigation and the Guide's interface operations are both expressed as mutations to the `interface` slice; the slice's invariants enforce the conflict-resolution rules, so the Guide's conflicting actions are rejected at the state level rather than resolved by the UI ad hoc. The UI renders the current `interface` state reactively.
 
 ## Scene
 
@@ -62,7 +62,7 @@ An **overlay plane** is a fixed plane above the topmost tablet, hosting the Guid
 
 ### Rendering technology
 
-The scene is rendered on the main thread, as defined by [Usage and deployment](./usage-and-deployment.spec.md#main-thread). Animation of the avatar and tablet transitions may use `OffscreenCanvas` in a worker, with frames transferred to the main thread via the service bus's Transferable object support, as defined by [Service bus](./service-bus.spec.md#transferable-objects); general UI logic remains on the main thread. The specific rendering library is an implementation concern, provided the scene is presented as the spatial model defined here and UI logic runs on the main thread.
+The scene is rendered on the main thread, as defined by [Usage and deployment](./usage-and-deployment.spec.md#main-thread). Animation of the avatar and tablet transitions may use `OffscreenCanvas` in a worker, with frames transferred to the main thread via the runtime's Transferable object support, as defined by [Runtime](./runtime.spec.md#transferable-objects); general UI logic remains on the main thread. The specific rendering library is an implementation concern, provided the scene is presented as the spatial model defined here and UI logic runs on the main thread.
 
 ```gherkin
 Feature: Scene
@@ -422,7 +422,7 @@ The Retrieve operation retrieves content blocks by ID, by properties, or by text
 
 ### UI-control tools
 
-The Guide's Navigate and Draw-attention operations are invoked through UI-control tools, registered on the service bus as defined by [Service bus](./service-bus.spec.md) and dispatched by the constrained agent, as defined by [Constrained agent](./constrained-agent.spec.md#tool-categories). This specification defines the tools that back the Guide's interface operations.
+The Guide's Navigate and Draw-attention operations are invoked through UI-control tools, registered on the runtime as defined by [Runtime](./runtime.spec.md) and dispatched by the constrained agent, as defined by [Constrained agent](./constrained-agent.spec.md#tool-categories). This specification defines the tools that back the Guide's interface operations.
 
 The UI-control category must include at least the following tools:
 
@@ -431,13 +431,13 @@ The UI-control category must include at least the following tools:
 | `navigate` | `{ document: DocumentId, block?: BlockId }` | Propose a Navigate operation: push/bring forward the document's tablet and focus the block if given. **Dispatch enforces User precedence:** the dispatch inspects the current `interface` stack — if the active document's tablet has `openedBy: "ui"` and the call would change `activeDocument` away from it, the call is rejected with an error indicating the Visitor opened that document; the Guide must yield. A call that targets the current `ui`-opened active document (e.g. focusing a block within it) is accepted. Surviving calls are proposed as an `interface` slice update with `source: "guide"`. | Yes |
 | `draw_attention` | `{ document: DocumentId, block: BlockId }` | Render a transient Draw-attention highlight on the block within the document's tablet, as defined in [Attention](#attention). The document must be the active document; otherwise the tool call fails and the Guide must first navigate. | Yes (transient) |
 
-These tools must conform to the UI-control category constraints defined by [Constrained agent](./constrained-agent.spec.md#tool-categories): they produce visible interface changes and are subject to the User precedence rules. The `navigate` tool enforces User precedence at dispatch time by inspecting the current `interface` stack (each tablet's `openedBy`), as defined in the tool's row above — **not** via a state-manager invariant. A `navigate` call that conflicts with a Visitor-established active document is rejected before any `interface` slice update is proposed; the Guide must yield, as defined by [Three-way interaction](./three-way-interaction.spec.md#conflict-resolution). The Guide may acknowledge the interruption in its response (Guide continuity), but must not reassert the preempted navigation.
+These tools must conform to the UI-control category constraints defined by [Constrained agent](./constrained-agent.spec.md#tool-categories): they produce visible interface changes and are subject to the User precedence rules. The `navigate` tool enforces User precedence at dispatch time by inspecting the current `interface` stack (each tablet's `openedBy`), as defined in the tool's row above — **not** via a runtime state invariant. A `navigate` call that conflicts with a Visitor-established active document is rejected before any `interface` slice mutation is committed; the Guide must yield, as defined by [Three-way interaction](./three-way-interaction.spec.md#conflict-resolution). The Guide may acknowledge the interruption in its response (Guide continuity), but must not reassert the preempted navigation.
 
 The `draw_attention` tool does not propose an `interface` slice update (attention is transient); it dispatches the transient highlight directly via the UI-control service. A `draw_attention` call targeting a block in an inactive document must fail with an error indicating the document is not active; the Guide must navigate to the document first.
 
 ### Avatar-interaction tools
 
-The Guide controls its avatar's presentation — position, visibility, animation, and speech — through avatar interaction tools, registered on the service bus and dispatched by the constrained agent, as defined by [Constrained agent](./constrained-agent.spec.md#tool-categories). This specification defines the avatar interaction tools that back the Guide's avatar control.
+The Guide controls its avatar's presentation — position, visibility, animation, and speech — through avatar interaction tools, registered on the runtime and dispatched by the constrained agent, as defined by [Constrained agent](./constrained-agent.spec.md#tool-categories). This specification defines the avatar interaction tools that back the Guide's avatar control.
 
 The avatar-interaction category must include at least the following tools:
 
@@ -528,7 +528,7 @@ Feature: UI-control tools
 
 ## The `interface` slice
 
-The `interface` state slice records the presented-interface state and enforces the three-way conflict-resolution rules. This section is the refinement of [State manager](./state-manager.spec.md#state-model) that establishes the concrete fields and invariants of the `interface` slice.
+The `interface` state slice records the presented-interface state and enforces the three-way conflict-resolution rules. This section is the refinement of [Runtime](./runtime.spec.md#slice-declarations) that establishes the concrete fields and invariants of the `interface` slice.
 
 ### Fields
 
@@ -551,19 +551,19 @@ const interfaceSliceSchema = z.object({
 
 The slice does **not** carry attention state (attention is transient, as defined in [Attention](#attention)) or speech state (speech is delivered by avatar-interaction tools and rendered as it is produced, not held in shared state).
 
-`UpdateSource` (`ui` | `guide` | `service`) is the actor that opened the tablet, as defined by [State manager](./state-manager.spec.md#update-proposals). A tablet's `openedBy` is set when it is pushed onto the stack and does not change while the tablet remains in the stack; bringing an existing tablet to the front does not change its `openedBy`.
+`UpdateSource` (`ui` | `guide` | `service`) is the actor that opened the tablet, as defined by [Runtime](./runtime.spec.md#mutation-processing). A tablet's `openedBy` is set when it is pushed onto the stack and does not change while the tablet remains in the stack; bringing an existing tablet to the front does not change its `openedBy`.
 
 ### Invariants
 
-The `interface` slice declares the following invariant functions, as defined by [State manager](./state-manager.spec.md#slice-invariants). Each invariant receives the proposed resulting value and the proposal's `source` (`ui` | `guide` | `service`).
+The `interface` slice declares the following invariant functions, as defined by [Runtime](./runtime.spec.md#invariants). Each invariant receives the proposed resulting value and the mutation's `source` (`ui` | `guide` | `service`).
 
 1. **Internal consistency.** The proposed value must be internally consistent: `activeDocument` must equal `stack[0]?.document ?? null`, and `focus`, when non-null, must reference a block within `activeDocument`. This invariant is source-independent (applies to all sources).
 
 2. **Active-document focus.** `focus`, when non-null, must reference a block within `activeDocument`. (This is the same as the relevant part of internal consistency, restated as a distinct invariant for clarity.)
 
-The `interface` slice does **not** declare a User-precedence invariant. User precedence is enforced at tool-call dispatch time, not at the state-manager authority: the `navigate` tool's dispatch inspects the current stack (with each tablet's `openedBy`) and rejects a Guide navigation that would override a `ui`-opened active document, as defined in [UI-control tools](#ui-control-tools). This keeps the state-manager invariants pure (no authority-side state between proposals) and locates conflict resolution where the Guide's action is initiated.
+The `interface` slice does **not** declare a User-precedence invariant. User precedence is enforced at tool-call dispatch time, not at the runtime state authority: the `navigate` tool's dispatch inspects the current stack (with each tablet's `openedBy`) and rejects a Guide navigation that would override a `ui`-opened active document, as defined in [UI-control tools](#ui-control-tools). This keeps the runtime's state invariants pure (no authority-side state between mutations) and locates conflict resolution where the Guide's action is initiated.
 
-A rejected proposal rejects the `proposeUpdate` bus call with a `StateInvariantError`, as defined by [State manager](./state-manager.spec.md#rejection). The Guide's tool call fails, and the constrained agent handles the failed tool result, as defined by [Constrained agent](./constrained-agent.spec.md).
+A rejected mutation rejects the store's mutation call with an invariant rejection error, as defined by [Runtime](./runtime.spec.md#invariants). The Guide's tool call fails, and the constrained agent handles the failed tool result, as defined by [Constrained agent](./constrained-agent.spec.md).
 
 ```gherkin
 Feature: Interface slice invariants
@@ -595,11 +595,11 @@ The specific rest message text and the conditions under which the backend signal
 
 ## Reactivity and shared state
 
-The UI is a reactive consumer of the `interface` state slice, as defined by [State manager](./state-manager.spec.md#local-copies).
+The UI is a reactive consumer of the `interface` state slice, as defined by [Runtime](./runtime.spec.md#local-copies).
 
-- The UI (main thread) holds a `LocalCopy` of the `interface` slice, provided by a `<state-manager-host>` element, as defined by the `@darkling/state-manager` package's Lit integration.
+- The UI (main thread) holds a `LocalCopy` of the `interface` slice, provided by a `<runtime-host>` element, as defined by the `@darkling/runtime` package's Lit integration.
 - The UI renders the current `interface` state (stack, activeDocument, focus) reactively, using TC39 signals via the `@lit-labs/signals` integration, so that accepted updates from any source (Visitor or Guide) re-render the reading surface.
-- Visitor navigation and the Guide's `navigate` tool both propose updates to the `interface` slice via `proposeUpdate` bus calls, as defined by [State manager](./state-manager.spec.md#update-proposals). The UI does not mutate its local copy except by applying broadcast patches.
+- Visitor navigation and the Guide's `navigate` tool both commit mutations to the `interface` slice via the store interface, as defined by [Runtime](./runtime.spec.md#store-interface). The UI does not mutate its local copy except by applying propagated changes.
 - The Guide's `draw_attention` tool does not propose an `interface` update; it dispatches a transient effect rendered by the UI without changing shared state, as defined in [Attention](#attention).
 
 ## Conformance
@@ -617,7 +617,7 @@ An implementation of the UI conforms to this specification when:
 - it produces exactly the high-level semantic event types defined in [Events](#events), with the defined payloads, and produces no events for Guide actions or internal state changes, as defined in [Event sources and non-events](#event-sources-and-non-events);
 - it provides an address input producing `direct_address` events, as defined in [Addressing the Guide](#addressing-the-guide);
 - it registers the `navigate` and `draw_attention` UI-control tools and the `speak`, `set_avatar_position`, `set_avatar_visibility`, and `animate_avatar` avatar-interaction tools on the bus with the defined parameters and effects, as defined in [UI-control tools](#ui-control-tools) and [Avatar-interaction tools](#avatar-interaction-tools);
-- it declares the `interface` slice with the fields and invariants defined in [The `interface` slice](#the-interface-slice) (internal consistency, including per-tablet `openedBy`), and enforces User precedence at `navigate` tool-call dispatch time, not via a state-manager invariant, as defined in [UI-control tools](#ui-control-tools);
+- it declares the `interface` slice with the fields and invariants defined in [The `interface` slice](#the-interface-slice) (internal consistency, including per-tablet `openedBy`), and enforces User precedence at `navigate` tool-call dispatch time, not via a runtime state invariant, as defined in [UI-control tools](#ui-control-tools);
 - it presents the spend cap as an in-world rest message through the Guide's avatar speech, as defined in [Cap enforcement](#cap-enforcement);
 - it runs on the main thread, with animation optionally via `OffscreenCanvas` in a worker, as defined in [Rendering technology](#rendering-technology) and [Usage and deployment](./usage-and-deployment.spec.md#main-thread);
 - it consumes the `interface` slice reactively via a `LocalCopy` and TC39 signals, proposing updates through the bus, as defined in [Reactivity and shared state](#reactivity-and-shared-state).

@@ -24,7 +24,7 @@ Where this specification depends on behaviour defined by domain specifications, 
 
 ## Design context
 
-Several domain specifications govern behaviour whose specific values are implementation-defined: [Constrained agent](./constrained-agent.spec.md) owns budget and flush policy parameters; [Content-first retrieval](./content-first-retrieval.spec.md) owns retrieval policy parameters; [Agent safety](./agent-safety.spec.md) references the cost of `safety_consult` as a policy parameter; [Service bus](./service-bus.spec.md) references broker host-launch policy. Each of those specifications defines _which_ parameters exist and _what_ they govern, and requires that they have defined values, but leaves the specific values to implementation.
+Several domain specifications govern behaviour whose specific values are implementation-defined: [Constrained agent](./constrained-agent.spec.md) owns budget and flush policy parameters; [Content-first retrieval](./content-first-retrieval.spec.md) owns retrieval policy parameters; [Agent safety](./agent-safety.spec.md) references the cost of `safety_consult` as a policy parameter; [Runtime](./runtime.spec.md) references broker host-launch policy. Each of those specifications defines _which_ parameters exist and _what_ they govern, and requires that they have defined values, but leaves the specific values to implementation.
 
 This specification extracts and unifies the structural rules common to all of those scattered policy parameters: that they must exist, must have defined values, must be resolvable through a configuration source, and must have a system-wide default. This avoids duplicating the structural contract across domain specs, establishes a uniform delivery mechanism, and provides a single place to reason about how policy values are provided to subsystems.
 
@@ -230,7 +230,7 @@ The following domain specifications define policy parameters and are subject to 
 Other specifications reference policy parameters without a dedicated table:
 
 - [Agent safety](./agent-safety.spec.md#relationship-to-the-budget) — the cost of `safety_consult`, owned by the [Constrained agent](./constrained-agent.spec.md#policy-parameters) tool call costs parameter.
-- [Service bus](./service-bus.spec.md#on-demand-activation) — the broker host-launch policy, which is a broker policy informed by service metadata, not a policy parameter governed by this specification.
+- [Runtime](./runtime.spec.md#on-demand-activation) — the broker host-launch policy, which is a broker policy informed by service metadata, not a policy parameter governed by this specification.
 - [Authoring tooling](./authoring-tooling.spec.md#slug-uniqueness) — slug collision resolution policy, which is an implementation detail of compilation rather than a runtime policy parameter.
 
 A domain specification that introduces new policy parameters must link to this specification and satisfy this contract. This specification does not enumerate the parameters; it defines the rules they follow.

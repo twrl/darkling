@@ -1,5 +1,9 @@
 # `@darkling/service-bus` package
 
+> **This package specification is superseded by the consolidation of the Service Bus and State Manager into [Runtime](../../specs/runtime.spec.md).**
+>
+> The `@darkling/service-bus` and `@darkling/state-manager` packages are being consolidated into a single `@darkling/runtime` package. The normative requirements are now defined by [Runtime](../../specs/runtime.spec.md). This file is retained as a historical reference for the existing implementation; it will be replaced by a `@darkling/runtime` package specification when the consolidation is implemented.
+
 ## Purpose and scope
 
 This specification defines the `@darkling/service-bus` package: the implementation package that provides the service bus as a consumable library.

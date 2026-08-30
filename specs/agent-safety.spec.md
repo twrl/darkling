@@ -19,7 +19,7 @@ It is explicitly out of scope for this specification to define:
 - the consultant's prompt or system prompt construction — which is an implementation detail;
 - the constrained agent's tool-call discipline, tool categories, budget, and working memory — which are defined by [Constrained agent](./constrained-agent.spec.md);
 - the three-way interaction model — which is defined by [Three-way interaction](./three-way-interaction.spec.md);
-- the service bus — which is defined by [Service bus](./service-bus.spec.md).
+- the runtime — which is defined by [Runtime](./runtime.spec.md).
 
 Where this specification depends on behaviour defined by those specifications, it links to them and states its requirement in terms of their observable behaviour.
 
@@ -48,7 +48,7 @@ The Guide may call `safety_consult` at any point in an interaction, before issui
 
 The safety consultant is a separate LLM agent, distinct from the Guide. The consultant receives the Guide's consultation request and returns advice.
 
-- The consultant is invoked by the `safety_consult` tool call, dispatched through the [Service bus](./service-bus.spec.md) as a service.
+- The consultant is invoked by the `safety_consult` tool call, dispatched through the [Runtime](./runtime.spec.md) as a service.
 - The consultant has its own prompt and system prompt, configured to assess content safety. The specific prompt construction is an implementation detail.
 - The consultant does not interact with the User and is not visible to the User. It is an internal advisory service to the Guide, returning recommendations at one of three tiers.
 - The consultant receives the content or proposed action and context from the `safety_consult` parameters, and returns advice based on its safety assessment.
@@ -167,7 +167,7 @@ The Guide may use working memory, as defined by [Constrained agent](./constraine
 An implementation conforms to this specification when:
 
 - the `safety_consult` tool is available in the agent self tool category, alongside `update_working_memory`;
-- the `safety_consult` tool invokes a separate LLM agent (the safety consultant) through the service bus;
+- the `safety_consult` tool invokes a separate LLM agent (the safety consultant) through the runtime;
 - the consultant returns tiered advice: `info` (consider, may act or not), `warning` (adjust responses, regularly return to consultant), and `critical` (defer to consultant's recommendations, must not produce advised-against content);
 - the Guide calls `safety_consult` at its own discretion, encouraged by its prompt to consult when uncertain;
 - the Guide never breaks character to refuse, self-censor, or explain a safety decision;
