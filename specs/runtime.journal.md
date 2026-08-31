@@ -103,6 +103,47 @@ The user requested clarification of FIFO processing. Two layers were established
 
 This gives the initializer a two-stage guarantee: delivery gate (runtime delivers initializer first) + completion gate (host serial processing ensures initializer completes before anything else starts).
 
+### Registration and discovery
+
+The user proposed a unified registration model where both services and slices have serializable registration records (id + module specifier) used for discovery, while live declarations (Zod schemas, transition functions, invariant functions) are obtained by each context importing the declaration module. This resolves the live-objects problem: registration records cross `postMessage`; live declarations don't.
+
+Key decisions:
+
+- **`registerService` on `RuntimeClient`** — any context with a client can register a service. Registration is synchronous within the broker; once resolved, the service is immediately callable.
+- **`registerSlice` on the store builder** — the authority receives the registration, dynamically imports the `*.slice.ts` module to get the live `SliceDeclaration`, and stores it. `registerSlice` resolves when the module is loaded and the slice is ready to process mutations.
+- **Registry pseudo-slice** — the authority maintains a built-in pseudo-slice (not declared via `SliceDeclaration`, no mutations or invariants, updated directly not through the mutation path) that records all registered services and slices. It uses the same propagation mechanism as regular slices, so all local copies can discover registrations reactively.
+- **Dynamic registration** — both services and slices may be registered at any time, not only at bootstrap. A mutation to an unregistered or not-yet-loaded slice must be rejected.
+- **`SliceRegistration`** is minimal: `{ id, moduleSpecifier }`. Clients can eagerly or lazily load slice declarations by observing the registry.
+
+### Module conventions: default exports with filename conventions
+
+The user moved to a convention where declaration modules use default exports with filename conventions: `*.service.ts` for service declarations, `*.slice.ts` for slice declarations. This replaces the former named `declaration` export convention. Since declarations are loaded by dynamic import, the default export is the cleanest pattern.
+
+For slices, there is no separate implementation module — the transition and invariant functions in the `SliceDeclaration` are the implementation. For services, the `implementationLoader` still wraps a dynamic `import()` pointing to a separate implementation module.
+
+### Service metadata: `requiredSlices` and `initializer`
+
+The user moved the `initializer` from a top-level field on `ServiceDeclaration` into `ServiceMetadata`, alongside a new `requiredSlices` field. This groups all activation-lifecycle concerns in one place: where the service runs (`onBroker`), what it needs before activation (`requiredSlices`), and how it initializes (`initializer`).
+
+### Activation flow: four-state model
+
+With `requiredSlices` and `initializer` both in metadata, the activation flow becomes a four-state model:
+
+```
+inactive → activating_1 → activating_2 → active
+```
+
+- `activating_1`: implementation instantiated, waiting for required slices to load (host-level gating).
+- `activating_2`: required slices loaded, waiting for initializer to be delivered and completed.
+
+Each state is optional: no `requiredSlices` skips `activating_1`; no `initializer` skips `activating_2`; neither transitions directly to active. The host (not the broker) manages these states. The broker routes messages and launches hosts as usual, unaware of activation states.
+
+The initializer is guaranteed to be the first invocation the service receives once all required slices are available. If the initializer arrives during `activating_1`, it queues normally and is extracted when the service transitions to `activating_2`.
+
+### Store builder: registration, discovery, and events
+
+The store builder exposes `registerSlice` for slice registration, `availableSlices()` for reactive discovery, and `store(sliceDeclaration)` for obtaining a typed store. The store builder should implement the `EventEmitter` interface (DOM/Node API sense) so consumers can be notified when slices become available.
+
 ### BroadcastChannel: properties, not mechanism
 
 The user did not feel strongly about whether `BroadcastChannel` is normatively mandated or specified by properties. The specification specifies the required properties (fan-out, ordering, gap recovery, separation) and names `BroadcastChannel` as the reference implementation. This is consistent with the project's spec philosophy ("describe required behaviour and observable properties rather than implementation details") and the current package's `PatchChannel` abstraction.

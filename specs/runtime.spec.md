@@ -95,6 +95,7 @@ The `RuntimeClient` is the caller-side component of the runtime. It is available
 - The `RuntimeClient` creates typed proxies on demand from service declarations, as defined in [Typed proxies](#typed-proxies).
 - The `RuntimeClient` handles promise resolution: it issues calls to the broker, correlates return and error messages by message ID, and resolves or rejects the caller's promise, as defined in [Promise resolution](#promise-resolution).
 - The `RuntimeClient` exposes low-level dispatch primitives (`call`, `behaviour`) for use by proxy factories, as defined in [Proxy factories](#proxy-factories).
+- The `RuntimeClient` exposes `registerService` for service registration, as defined in [Registration and discovery](#registration-and-discovery).
 - A caller — whether on the main thread or within a service — obtains a proxy from the `RuntimeClient` and invokes service functions and behaviours through it.
 
 ### Worker topology
@@ -122,15 +123,15 @@ Each service declares its interface and metadata separately from its implementat
   - an **implementation loader** — a function that asynchronously loads and returns the implementation class, as defined in [Declaration module and implementation loading](#declaration-module-and-implementation-loading);
   - **metadata** (optional) — service-level metadata used by the broker for routing and activation decisions.
 - A service declaration may include:
-  - an **initializer** — the name of a behaviour to be delivered before any other message to the service, as defined in [Initialization](#initialization);
   - a **proxy factory** — a function that produces a custom client-side proxy, as defined in [Proxy factories](#proxy-factories).
 - The service implementation is not part of the declaration. The broker uses the declaration to route calls; the host loads and executes the implementation.
+- Service metadata may include an **initializer** and **required slices**, which govern the activation lifecycle, as defined in [Service metadata](#service-metadata) and [Initialization](#initialization).
 
 ### Declaration module and implementation loading
 
 A service's declaration and implementation are separate modules. The declaration module is the service's entry point; the implementation module is loaded lazily by the declaration's `implementationLoader`. This separation allows the broker, callers, and hosts to use the declaration (for routing, validation, typed proxies) without loading the implementation, and allows the host worker to load the implementation on demand when activating a service.
 
-- The declaration module must export the `ServiceDeclaration` as a named `declaration` export. This is the convention by which the host worker obtains the declaration: it dynamically imports the declaration module and reads the `declaration` export.
+- A service's declaration module must follow the `*.service.ts` naming convention and must export the `ServiceDeclaration` as the default export. This is the convention by which hosts and clients obtain the declaration: they dynamically import the declaration module and read the default export.
 - The `implementationLoader` must return a promise that resolves to the implementation's constructor — a class extending `ServiceImplementation`. The host instantiates the constructor with a `HostContext`, injecting runtime access at construction time.
 - The `implementationLoader` must load the implementation module via dynamic `import()`, so that the implementation is not loaded until a host needs to activate the service. This keeps the implementation out of the initial bundle and allows it to be loaded on demand.
 - The declaration module must not import the implementation module at module-load time. The declaration may import only the types and schemas needed to declare the service's interface; importing the implementation would defeat the lazy-loading purpose of the `implementationLoader`.
@@ -142,10 +143,9 @@ Feature: Declaration module and implementation loading
   Rule: The declaration and implementation are separate modules; the loader imports the implementation on demand
 
   Scenario: Host worker loads a declaration
-    Given a service "retrieval" with declaration module "@darkling/knowledge-base/service"
+    Given a service "retrieval" with declaration module "@darkling/knowledge-base/retrieval.service"
     When the host worker dynamically imports the declaration module
-    Then the module must export a named "declaration" export
-    And the export must be a ServiceDeclaration
+    Then the module must export the ServiceDeclaration as the default export
 
   Scenario: Implementation loaded lazily
     Given a service declaration with an implementationLoader
@@ -161,22 +161,44 @@ Feature: Declaration module and implementation loading
 
 ### Service metadata
 
-Service metadata provides hints to the broker for routing and activation decisions.
+Service metadata provides hints to the broker for routing and activation decisions, and governs the service's activation lifecycle.
 
 - **`onBroker`** — if `true`, the service should be activated on the broker's local host. If `false` or omitted, the broker decides where to place the service, using other metadata and its own policy. The broker should respect this hint but may override it (e.g. if a service declares `onBroker: true` but has heavy resource requirements).
 - **`capabilities`** — capabilities this service provides, for broker host-assignment decisions.
 - **`hostRequirements`** — requirements for this service's host (e.g. specific APIs, worker configuration).
+- **`requiredSlices`** — the slice identifiers this service commits mutations to or reads. The host must not transition the service past the `activating_1` state until all listed slices are loaded by the authority, as defined in [Initialization](#initialization).
+- **`initializer`** — the name of a behaviour in the `behaviours` map to be delivered as the first invocation to the service once all required slices are available, as defined in [Initialization](#initialization).
 
 Additional metadata fields may be introduced by refinement.
 
-### Service registry
+## Registration and discovery
 
-The broker maintains a service registry of service declarations.
+Registration is the mechanism by which the runtime discovers what services and slices exist. Registration records are serializable — they carry the service or slice identifier and the module specifier of the declaration module, not live declaration objects. Live declarations (carrying Zod schema objects, transition functions, and invariant functions) are obtained by each context that needs them by importing the declaration module.
 
-- Each service must be registered with the broker before it can be invoked.
-- A service registration must include the service identifier and the module specifier of the declaration module. The registration may include service metadata.
-- The registry maps service identifiers to their registration records (module specifier and metadata), not to specific host instances. The broker decides which host executes a service at dispatch time, as defined in [On-demand activation](#on-demand-activation).
-- Registrations must be structured-cloneable, as they may cross worker boundaries via `postMessage`. Live declarations (carrying Zod schema objects) are not held by the broker; each host imports the declaration module to obtain live instances.
+### Service registration
+
+- The `RuntimeClient` exposes `registerService(registration)` for service registration. A service registration must include the service identifier and the module specifier of the declaration module. The registration may include service metadata.
+- The broker stores service registration records in its routing table. Registration is synchronous within the broker: once `registerService` resolves, the service is immediately callable.
+- The broker updates the [registry pseudo-slice](#registry-pseudo-slice) (held by the authority) so that all contexts can discover the registration reactively.
+- Registrations may arrive at any time, not only at bootstrap. A service registered at runtime is immediately callable.
+
+### Slice registration
+
+- The store builder exposes `registerSlice(registration)` for slice registration. A slice registration must include the slice identifier and the module specifier of the declaration module (`*.slice.ts`).
+- The authority receives the registration, dynamically imports the declaration module to obtain the live `SliceDeclaration` (schema, mutations, invariants), and stores it internally. `registerSlice` resolves when the module has been loaded and the slice is ready to process mutations.
+- The authority updates the registry pseudo-slice so that all contexts can discover the slice reactively.
+- Slices may be registered at any time. A mutation to an unregistered or not-yet-loaded slice must be rejected.
+
+### Registry pseudo-slice
+
+The authority maintains a built-in **registry pseudo-slice** that records all registered services and slices. It is a pseudo-slice: it is not declared via a `SliceDeclaration`, has no mutations or invariants, and is updated directly by the authority (not through the mutation path). It uses the same [state-change propagation](#state-change-propagation) mechanism as regular slices, so that all local copies can observe the registry reactively.
+
+The registry pseudo-slice's value contains:
+
+- **`services`** — a record mapping service identifiers to their registration records (module specifier and metadata);
+- **`slices`** — a record mapping slice identifiers to their registration records (module specifier).
+
+Consumers can observe the registry to discover what services and slices exist, and eagerly or lazily load the corresponding declaration modules as needed.
 
 ## Service interface contract
 
@@ -305,27 +327,32 @@ Feature: On-demand activation
 
 ## Initialization
 
-A service may declare an **initializer** — a named behaviour that is delivered before any other message to the service. The initializer is not called automatically by the runtime; it is invoked explicitly by the application's bootstrap code.
+A service's activation lifecycle is governed by two metadata fields: `requiredSlices` (the slices the service commits mutations to or reads) and `initializer` (a named behaviour delivered as the first invocation once required slices are available). Both are optional; a service with neither transitions directly to active after instantiation.
 
 ### Activation states
 
 Each service on a host has an activation state:
 
 - **inactive** — no host launched, implementation not loaded.
-- **activating** — host launched, implementation instantiated, initializer pending (if an initializer is declared).
-- **activated** — initializer delivered and completed, or no initializer declared.
+- **activating_1** — implementation instantiated, waiting for required slices to be loaded by the authority.
+- **activating_2** — required slices loaded (or none declared), waiting for the initializer to be delivered and completed.
+- **active** — initializer completed (or none declared), messages dispatched immediately.
 
-### Initializer protocol
+Transitions are optional: a service with no `requiredSlices` skips `activating_1` (transitions directly to `activating_2`); a service with no `initializer` skips `activating_2` (transitions directly to active). A service with neither transitions directly to active after instantiation.
 
-- When a service has an initializer declared, the service enters the **activating** state after the implementation is instantiated.
-- While a service is in the activating state, all messages to the service (functions and behaviours) must be queued by the host. They must not be dispatched to the implementation.
-- When a message arrives whose function name matches the declared initializer, it must **bypass the queue** — it must be delivered directly to the implementation, ahead of any queued messages.
+### Activation protocol
+
+- When a service is activated on a host, the host reads `metadata.requiredSlices` and `metadata.initializer`.
+- If `requiredSlices` is declared, the service enters **activating_1**. The host must not transition past `activating_1` until all listed slices are loaded by the authority. How the host determines slice availability (polling, observing the registry pseudo-slice, etc.) is an implementation concern.
+- While a service is in `activating_1` or `activating_2`, all messages to the service (functions and behaviours, including the initializer) must be queued by the host. They must not be dispatched to the implementation.
+- When all required slices are loaded, the service transitions to **activating_2**. If the initializer is already in the queue, the host extracts it and delivers it first (bypassing the queue order for other messages). If the initializer has not yet arrived, the host waits for it.
+- When a message arrives whose function name matches the declared initializer, and the service is in `activating_2`, it must **bypass the queue** — it must be delivered directly to the implementation, ahead of any queued messages. If the service is still in `activating_1`, the initializer queues normally and is extracted when the service transitions to `activating_2`.
 - The initializer must be a behaviour (fire-and-forget), not a function.
-- When the initializer's handler returns (completes), the service transitions to the **activated** state, and all queued messages must be dispatched in delivery order.
-- When a service has no initializer declared, the service transitions directly to the **activated** state after instantiation. Messages are dispatched immediately.
-- If the initializer is never called, the service remains in the activating state indefinitely. Queued function calls will time out (per the runtime's call timeout); queued behaviours will remain queued. This is a bootstrap error.
+- When the initializer's handler returns (completes), the service transitions to **active**, and all queued messages must be dispatched in delivery order.
+- If the initializer is never called, the service remains in `activating_2` indefinitely. Queued function calls will time out (per the runtime's call timeout); queued behaviours will remain queued. This is a bootstrap error.
+- If `requiredSlices` is declared but a listed slice is never registered, the service remains in `activating_1` indefinitely. This is also a bootstrap error.
 
-The broker is not concerned with initializer semantics. The broker routes messages to the host and launches hosts on demand as usual. The initializer protocol is entirely a host concern.
+The broker is not concerned with activation states or initializer semantics. The broker routes messages to the host and launches hosts on demand as usual. The activation protocol is entirely a host concern.
 
 ### Initializer parameters
 
@@ -333,18 +360,35 @@ The initializer is a behaviour with parameters, called explicitly by the applica
 
 ```gherkin
 Feature: Initialization
-  Rule: The initializer bypasses the queue; all other messages are queued until it completes
+  Rule: The initializer is the first invocation once required slices are available; all other messages queue until it completes
 
   Scenario: Messages queue during activation
-    Given a service "guide" with initializer "initialize"
-    And the service is in the activating state
+    Given a service "guide" with initializer "initialize" and requiredSlices ["interface"]
+    And the service is in activating_1 or activating_2
     When a caller invokes a function on "guide"
     Then the host must queue the message
     And must not dispatch it to the implementation
 
+  Scenario: Service waits for required slices
+    Given a service "guide" with requiredSlices ["interface"]
+    And the service is in activating_1
+    And the "interface" slice is not yet loaded
+    When the bootstrap code dispatches the "initialize" behaviour
+    Then the host must queue the initializer
+    And must not dispatch it to the implementation
+
+  Scenario: Initializer delivered after slices load
+    Given a service "guide" with initializer "initialize" and requiredSlices ["interface"]
+    And the service is in activating_1
+    And the "initialize" behaviour has been queued
+    When the "interface" slice becomes loaded
+    Then the service must transition to activating_2
+    And the host must extract "initialize" from the queue and deliver it to the implementation
+    And must not place it back in the queue
+
   Scenario: Initializer bypasses the queue
     Given a service "guide" with initializer "initialize"
-    And the service is in the activating state
+    And the service is in activating_2
     And a function call has been queued
     When the bootstrap code dispatches the "initialize" behaviour
     Then the host must deliver "initialize" directly to the implementation
@@ -352,17 +396,24 @@ Feature: Initialization
 
   Scenario: Queued messages dispatch after initialization
     Given a service "guide" with initializer "initialize"
-    And the service is in the activating state
+    And the service is in activating_2
     And a function call has been queued
     When the "initialize" behaviour's handler returns
-    Then the service must transition to the activated state
+    Then the service must transition to active
     And the host must dispatch the queued function call in delivery order
 
-  Scenario: No initializer — immediate activation
-    Given a service "retrieval" with no initializer declared
+  Scenario: No required slices or initializer — immediate activation
+    Given a service "retrieval" with no requiredSlices and no initializer
     When the broker activates "retrieval" on a host
-    Then the service must transition directly to the activated state
+    Then the service must transition directly to active
     And messages must be dispatched immediately
+
+  Scenario: Required slices but no initializer
+    Given a service "avatar" with requiredSlices ["interface"] and no initializer
+    And the service is in activating_1
+    When the "interface" slice becomes loaded
+    Then the service must transition directly to active
+    And queued messages must be dispatched in delivery order
 ```
 
 ## Message ordering
@@ -559,6 +610,9 @@ interface RuntimeClient {
   proxy<T extends ServiceDeclaration>(declaration: T): T extends { proxyFactory: infer F }
     ? ReturnType<F>
     : ServiceInterface<T>;
+
+  // Service registration — see Registration and discovery
+  registerService(registration: ServiceRegistration): Promise<void>;
 }
 ```
 
@@ -604,9 +658,9 @@ The runtime's state model follows a Flux/Vuex-like architecture:
 
 ## Slice declarations
 
-The shared state is partitioned into a fixed set of named **slices**. Each slice is an independently versioned, independently updated unit of state.
+The shared state is partitioned into named **slices**. Each slice is an independently versioned, independently updated unit of state.
 
-- The set of slices must be fixed and declared up front. Slices must not be registered dynamically at runtime.
+- Slices are registered dynamically via `registerSlice`, as defined in [Registration and discovery](#registration-and-discovery). A mutation to an unregistered or not-yet-loaded slice must be rejected.
 - Each slice must declare:
   - a **slice identifier** — a unique name;
   - a **schema** — a Zod v4 schema describing the slice's value;
@@ -617,6 +671,37 @@ The shared state is partitioned into a fixed set of named **slices**. Each slice
   - a **transition function** — an Immer recipe that receives a draft of the slice's current value and the mutation's parameters, and mutates the draft to produce the next state. The authority derives patches from the transition using Immer's `produceWithPatches` mechanism.
 - A slice's value must conform to its schema at all times. The authority must not accept any mutation that would leave the slice's value non-conforming.
 - Each slice carries an independent monotonic sequence number, assigned by the authority on each accepted mutation, as defined in [State-change propagation](#state-change-propagation).
+
+### Slice declaration module convention
+
+A slice's declaration module must follow the `*.slice.ts` naming convention and must export the `SliceDeclaration` as the default export. The authority dynamically imports the declaration module when processing a `SliceRegistration` to obtain the live `SliceDeclaration` (schema, mutations, invariants). Each context that needs the live declaration (for a local copy, for a typed store) imports the module itself.
+
+- The declaration module must not import any implementation modules. The slice declaration carries only schemas, transition functions, and invariant functions — all of which are pure. There is no separate implementation module for slices; the transition and invariant functions are the implementation.
+
+```ts
+// Zod 4 — declaration-level type illustration
+interface SliceDeclaration<TValue = unknown> {
+  id: string;
+  schema: z.ZodType<TValue>;
+  invariants?: ReadonlyArray<
+    (proposedValue: TValue, context: InvariantContext) => InvariantVerdict
+  >;
+  mutations: Record<string, SliceMutationDeclaration<TValue>>;
+}
+
+interface SliceMutationDeclaration<TValue> {
+  params: z.ZodType;
+  transition: (draft: TValue, params: z.infer<params>) => void;
+  description?: string;
+}
+```
+```
+
+### Slice declaration module convention
+
+A slice's declaration module must follow the `*.slice.ts` naming convention and must export the `SliceDeclaration` as the default export. The authority dynamically imports the declaration module when processing a `SliceRegistration` to obtain the live `SliceDeclaration` (schema, mutations, invariants). Each context that needs the live declaration (for a local copy, for a typed store) imports the module itself.
+
+- The declaration module must not import any implementation modules. The slice declaration carries only schemas, transition functions, and invariant functions — all of which are pure and serializable within the module's scope. There is no separate implementation module for slices; the transition and invariant functions are the implementation.
 
 This specification declares that the following slices exist:
 
@@ -840,7 +925,7 @@ The specific signals library or polyfill is an implementation concern, provided 
 
 ## Store interface
 
-The state authority uses a [proxy factory](#proxy-factories) to produce a **store builder** — a client-side interface that wraps the raw `mutate` and `getSnapshot` calls with a typed, per-slice store.
+The state authority uses a [proxy factory](#proxy-factories) to produce a **store builder** — a client-side interface that wraps the raw `mutate` and `getSnapshot` calls with a typed, per-slice store, and provides slice registration and discovery.
 
 ### Store builder
 
@@ -850,11 +935,12 @@ The consumer obtains a store builder by creating a proxy for the state authority
 const stores = client.proxy(stateAuthorityDeclaration);
 ```
 
-The store builder provides a `store` method that takes a `SliceDeclaration` and returns a typed **store** for that slice:
+The store builder exposes:
 
-```ts
-const interfaceStore = stores.store(interfaceSliceDeclaration);
-```
+- **`store(sliceDeclaration)`** — returns a typed **store** for the given slice, as defined in [Store](#store) below. The caller must have already registered the slice via `registerSlice` (or observed it in the registry) before calling `store`.
+- **`registerSlice(registration)`** — registers a slice with the authority, as defined in [Registration and discovery](#registration-and-discovery). Returns a promise that resolves when the slice declaration module has been loaded and the slice is ready to process mutations.
+- **`availableSlices()`** — returns the current set of registered slice identifiers, derived from the registry pseudo-slice. This is a reactive read; when called within a signal context, it re-evaluates when the registry changes.
+- The store builder should implement the `EventEmitter` interface (in the DOM/Node API sense) and emit events when slices become available. Consumers can subscribe to be notified when a new slice is registered and loaded. The specific event names and payload shapes are an implementation concern, provided that consumers can observe slice availability reactively.
 
 ### Store
 
@@ -912,7 +998,8 @@ An implementation conforms to this specification when:
 - a `ServiceBroker` runs in a Web Worker and routes messages between runtime clients and service hosts;
 - the broker owns a local `ServiceHost` for colocated services (`onBroker: true`) and manages zero or more remote hosts in dedicated service host workers;
 - a `RuntimeClient` is available both on the main thread and to any service, creates typed proxies on demand from service declarations, and handles promise resolution;
-- each service declares its interface and metadata — including functions, behaviours, an implementation loader, and optional initializer and proxy factory — separately from its implementation, registered with the broker;
+- each service declares its interface and metadata — including functions, behaviours, an implementation loader, and optional proxy factory — separately from its implementation; service metadata may include `onBroker`, `requiredSlices`, and `initializer`;
+- the `RuntimeClient` exposes `registerService` for service registration; the store builder exposes `registerSlice` for slice registration; both are dynamic and produce entries in the registry pseudo-slice;
 - the broker decides when to launch a new host and when to activate a service and on which host, informed by service metadata;
 - the location where a service is running is transparent to a consumer;
 - service functions take an object and return a promise for an object, with parameters and returns validated against Zod 4 schemas;
@@ -921,11 +1008,11 @@ An implementation conforms to this specification when:
 - the broker routes messages using the head and correlates returns to calls by message ID; behaviours do not expect returns;
 - the `RuntimeClient` resolves or rejects caller promises based on return or error messages routed by the broker, and rejects on host failure;
 - Transferable objects in message bodies are identified by the proxy factory and listed in the head's `transferables` field, which is passed verbatim as the `transfer` parameter to `postMessage`;
-- a service with a declared initializer queues all non-initializer messages until the initializer behaviour is delivered; the initializer bypasses the queue and is processed to completion before queued messages are dispatched;
+- a service with `requiredSlices` declared enters `activating_1` after instantiation and must not progress until all listed slices are loaded; a service with an `initializer` declared enters `activating_2` after required slices are available and must not progress until the initializer behaviour is delivered and completed; the initializer is guaranteed to be the first invocation the service receives once all required slices are available;
 - the host processes messages to a given service strictly in delivery order (per-service serialisation); different services on the same host may process concurrently;
-- the state authority is a colocated service on the broker, holds the authoritative copy of every slice, serialises mutations, enforces schema validity and slice invariants, and propagates accepted changes;
+- the state authority is a colocated service on the broker, holds the authoritative copy of every slice and the registry pseudo-slice, serialises mutations, enforces schema validity and slice invariants, and propagates accepted changes;
 - mutations are named, typed state-transition functions (Immer recipes); the authority derives patches internally and propagates them;
 - optimistic concurrency is enforced via a basis sequence number embedded transparently by the store interface; `StaleBasisError` is retried transparently after local copy convergence;
 - local copies fetch initial snapshots on boot, apply propagated changes in sequence, recover from gaps, and expose reads through TC39 signals;
-- the store interface exposes reactive state and typed mutation methods, hiding basis sequences, stale-basis retries, and gap recovery from consumers;
+- the store builder exposes reactive state, typed mutation methods, slice registration, and slice availability discovery; the store interface hides basis sequences, stale-basis retries, and gap recovery from consumers;
 - the state-change propagation mechanism provides fan-out, ordering, and gap recovery; `BroadcastChannel` is the reference implementation.
