@@ -105,13 +105,13 @@ This gives the initializer a two-stage guarantee: delivery gate (runtime deliver
 
 ### Registration and discovery
 
-The user proposed a unified registration model where both services and slices have serializable registration records (id + module specifier) used for discovery, while live declarations (Zod schemas, transition functions, invariant functions) are obtained by each context importing the declaration module. This resolves the live-objects problem: registration records cross `postMessage`; live declarations don't.
+The user proposed a unified registration model where both services and slices have serializable registration records (id + module specifier) used for discovery, while live declarations (Zod schemas, transition functions) are obtained by each context importing the declaration module. This resolves the live-objects problem: registration records cross `postMessage`; live declarations don't.
 
 Key decisions:
 
 - **`registerService` on `RuntimeClient`** — any context with a client can register a service. Registration is synchronous within the broker; once resolved, the service is immediately callable.
 - **`registerSlice` on the store builder** — the authority receives the registration, dynamically imports the `*.slice.ts` module to get the live `SliceDeclaration`, and stores it. `registerSlice` resolves when the module is loaded and the slice is ready to process mutations.
-- **Registry pseudo-slice** — the authority maintains a built-in pseudo-slice (not declared via `SliceDeclaration`, no mutations or invariants, updated directly not through the mutation path) that records all registered services and slices. It uses the same propagation mechanism as regular slices, so all local copies can discover registrations reactively.
+- **Registry pseudo-slice** — the authority maintains a built-in pseudo-slice (not declared via `SliceDeclaration`, no mutations, updated directly not through the mutation path) that records all registered services and slices. It uses the same propagation mechanism as regular slices, so all local copies can discover registrations reactively.
 - **Dynamic registration** — both services and slices may be registered at any time, not only at bootstrap. A mutation to an unregistered or not-yet-loaded slice must be rejected.
 - **`SliceRegistration`** is minimal: `{ id, moduleSpecifier }`. Clients can eagerly or lazily load slice declarations by observing the registry.
 
@@ -119,7 +119,7 @@ Key decisions:
 
 The user moved to a convention where declaration modules use default exports with filename conventions: `*.service.ts` for service declarations, `*.slice.ts` for slice declarations. This replaces the former named `declaration` export convention. Since declarations are loaded by dynamic import, the default export is the cleanest pattern.
 
-For slices, there is no separate implementation module — the transition and invariant functions in the `SliceDeclaration` are the implementation. For services, the `implementationLoader` still wraps a dynamic `import()` pointing to a separate implementation module.
+For slices, there is no separate implementation module — the transition functions in the `SliceDeclaration` are the implementation. For services, the `implementationLoader` still wraps a dynamic `import()` pointing to a separate implementation module.
 
 ### Service metadata: `requiredSlices` and `initializer`
 
@@ -156,7 +156,17 @@ The user requested weakening the topology section in `usage-and-deployment.spec.
 
 Terminology: "service host worker" (a Web Worker running a `ServiceHost`) must be disambiguated from "Service Worker" (the browser offline/cache API).
 
-### Package: `@darkling/runtime`
+### Removal of slice invariants, mutation source, and cost field
+
+The user decided to remove slice invariant functions, the mutation `source` field, and the `cost` field from the runtime specification, after reviewing the initial `@darkling/runtime` implementation.
+
+**Slice invariants removed.** The invariant mechanism (per-slice invariant functions that could accept or reject a proposed mutation) was removed entirely. Schema validation (Zod validation of the proposed resulting value) remains as the sole acceptance check, folded into [Mutation processing](./runtime.spec.md#mutation-processing) rather than occupying a separate "Invariants" section. The motivating use case for invariants — conflict resolution on the `interface` slice — was already handled at tool-call dispatch time (the `navigate` tool inspects `openedBy` and rejects conflicting Guide navigations before any mutation is committed), as established by [UI](./ui.spec.md#ui-control-tools). The runtime-level invariant mechanism was therefore redundant: controlled mutations (typed transition functions) plus schema validation suffice, and conflict resolution belongs where the action is initiated, not at the state authority.
+
+**Mutation `source` removed.** The `source` field (`ui` | `guide` | `service`) on mutations — previously made available to invariant functions — was removed along with the invariants. The `UpdateSource` type no longer exists in the runtime. The `interface` slice's `openedBy` field (which recorded who opened each tablet) remains, but is now a UI domain concept defined inline in [UI](./ui.spec.md#the-interface-slice) using a local `'ui' | 'guide' | 'service'` enum, not a runtime type.
+
+**`cost` field removed.** The `cost?: number` field on `ServiceFunctionDeclaration` and `ServiceBehaviourDeclaration` was removed from both the spec's type illustration and the implementation. Budget and cost policy is owned by [Constrained agent](./constrained-agent.spec.md); the runtime spec does not need to carry it.
+
+The `StateInvariantError` error type was removed from the implementation. The `InvariantContext`, `InvariantVerdict`, and `UpdateSource` types were removed from `state-model.ts` and from the package's public exports.
 
 One package, `@darkling/runtime`, with internal module boundaries. The strongest argument: the colocated state authority is a service the broker *owns and hosts directly* — that dependency flows inward and shouldn't cross a package boundary. One package also means one consumer dependency, one lit integration, one set of worker entry points, and one package spec conforming to one root spec.
 
@@ -177,13 +187,13 @@ The following specifications reference the former Service Bus or State Manager a
 
 ## Gaps and open questions
 
-- **Concrete `interface` and `session` slice schemas + invariants** remain deferred to refinement, as in the former state manager spec. [UI](./ui.spec.md) establishes the `interface` slice refinement.
+- **Concrete `interface` and `session` slice schemas** remain deferred to refinement, as in the former state manager spec. [UI](./ui.spec.md) establishes the `interface` slice refinement.
 - **Signals library / polyfill** is unspecified. The spec requires TC39-signals-compatible API only.
 - **Call timeout and stale-basis retry limit** are implementation-defined until a refinement introduces policy parameters.
 - **Authority failover / persistence** is not specified. There is a single authority colocated with the broker; restart behaviour is implementation-defined.
 - **Service deactivation policy** — the spec states hosts may be deactivated when idle but does not define the idle threshold or deactivation behaviour. This is an implementation concern.
 - **Service discovery** — the spec defines registration but not how callers discover available services or their schemas. This may need clarification.
-- **Error types** — the spec requires errors to be returned in error message bodies but does not define a full error type taxonomy. Validation errors, host failures, stale-basis errors, and invariant rejections are mentioned but the hierarchy is an implementation concern.
+- **Error types** — the spec requires errors to be returned in error message bodies but does not define a full error type taxonomy. Validation errors, host failures, and stale-basis errors are mentioned but the hierarchy is an implementation concern.
 - **Schema transport** — the spec requires schemas in declarations but does not define how schemas are serialised between broker and hosts (they import the declaration module directly).
 - **Host-to-host communication** — the spec defines broker-to-host communication but does not address whether hosts can communicate directly or must route through the broker.
 - **Runtime events (generic pub/sub)** — deferred. May be added as a refinement if a genuine need emerges.

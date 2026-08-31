@@ -49,6 +49,10 @@ export type LogLevel = (typeof LogLevel)[keyof typeof LogLevel];
  * logging into a new subsystem.
  */
 export const LOG_TAGS = [
+  'runtime:broker',
+  'runtime:host',
+  'runtime:client',
+  'runtime:facade',
   'service-bus:broker',
   'service-bus:host',
   'service-bus:client',

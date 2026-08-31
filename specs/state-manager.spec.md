@@ -2,7 +2,7 @@
 
 > **This specification has been consolidated into [Runtime](./runtime.spec.md).**
 >
-> The state manager — the authority, local copies, the update path, the state model (slices, schemas, invariants), the broadcast protocol, the initialisation protocol, and policy parameters — is now part of the runtime subsystem governed by [Runtime](./runtime.spec.md). This file is retained as a redirect for existing references; it no longer carries independent normative content.
+> The state manager — the authority, local copies, the update path, the state model (slices, schemas), the broadcast protocol, the initialisation protocol, and policy parameters — is now part of the runtime subsystem governed by [Runtime](./runtime.spec.md). This file is retained as a redirect for existing references; it no longer carries independent normative content.
 >
 > The mapping of former sections to their new locations:
 >
@@ -13,7 +13,6 @@
 > | Update path             | [Runtime — Mutation processing](./runtime.spec.md#mutation-processing)                      |
 > | State model (slices)    | [Runtime — Slice declarations](./runtime.spec.md#slice-declarations)                        |
 > | Immer patches           | [Runtime — Mutation processing](./runtime.spec.md#mutation-processing)                      |
-> | Invariants              | [Runtime — Invariants](./runtime.spec.md#invariants)                                        |
 > | Update proposals        | [Runtime — Mutation processing](./runtime.spec.md#mutation-processing)                      |
 > | Optimistic concurrency  | [Runtime — Optimistic concurrency](./runtime.spec.md#optimistic-concurrency)                |
 > | Broadcast protocol      | [Runtime — State-change propagation](./runtime.spec.md#state-change-propagation)            |

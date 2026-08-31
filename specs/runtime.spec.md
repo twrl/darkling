@@ -24,9 +24,9 @@ It is explicitly out of scope for this specification to define:
 - the constrained agent — including the agentic model, tool-call discipline, tool categories, and budget — which is defined by [Constrained agent](./constrained-agent.spec.md);
 - the content model and retrieval interface — which are defined by [Content model](./content-model.spec.md) and [Content-first retrieval](./content-first-retrieval.spec.md);
 - the three-way interaction model — the roles of the actors, the permitted interface operations, and the conflict-resolution rules — which is defined by [Three-way interaction](./three-way-interaction.spec.md);
-- the `interface` slice's concrete fields and conflict-resolution invariants — which are established by [UI](./ui.spec.md) as a refinement of this specification;
+- the `interface` slice's concrete fields — which are established by [UI](./ui.spec.md) as a refinement of this specification;
 - the runtime topology — which subsystems run in which workers — which is defined by [Usage and deployment](./usage-and-deployment.spec.md);
-- the concrete field schemas and invariants of the `interface` and `session` slices — which are established by refinement of this specification.
+- the concrete field schemas of the `interface` and `session` slices — which are established by refinement of this specification.
 
 Where this specification depends on behaviour defined by those specifications, it links to them and states its requirement in terms of their observable behaviour.
 
@@ -173,7 +173,7 @@ Additional metadata fields may be introduced by refinement.
 
 ## Registration and discovery
 
-Registration is the mechanism by which the runtime discovers what services and slices exist. Registration records are serializable — they carry the service or slice identifier and the module specifier of the declaration module, not live declaration objects. Live declarations (carrying Zod schema objects, transition functions, and invariant functions) are obtained by each context that needs them by importing the declaration module.
+Registration is the mechanism by which the runtime discovers what services and slices exist. Registration records are serializable — they carry the service or slice identifier and the module specifier of the declaration module, not live declaration objects. Live declarations (carrying Zod schema objects and transition functions) are obtained by each context that needs them by importing the declaration module.
 
 ### Service registration
 
@@ -185,13 +185,13 @@ Registration is the mechanism by which the runtime discovers what services and s
 ### Slice registration
 
 - The store builder exposes `registerSlice(registration)` for slice registration. A slice registration must include the slice identifier and the module specifier of the declaration module (`*.slice.ts`).
-- The authority receives the registration, dynamically imports the declaration module to obtain the live `SliceDeclaration` (schema, mutations, invariants), and stores it internally. `registerSlice` resolves when the module has been loaded and the slice is ready to process mutations.
+- The authority receives the registration, dynamically imports the declaration module to obtain the live `SliceDeclaration` (schema, mutations), and stores it internally. `registerSlice` resolves when the module has been loaded and the slice is ready to process mutations.
 - The authority updates the registry pseudo-slice so that all contexts can discover the slice reactively.
 - Slices may be registered at any time. A mutation to an unregistered or not-yet-loaded slice must be rejected.
 
 ### Registry pseudo-slice
 
-The authority maintains a built-in **registry pseudo-slice** that records all registered services and slices. It is a pseudo-slice: it is not declared via a `SliceDeclaration`, has no mutations or invariants, and is updated directly by the authority (not through the mutation path). It uses the same [state-change propagation](#state-change-propagation) mechanism as regular slices, so that all local copies can observe the registry reactively.
+The authority maintains a built-in **registry pseudo-slice** that records all registered services and slices. It is a pseudo-slice: it is not declared via a `SliceDeclaration`, has no mutations, and is updated directly by the authority (not through the mutation path). It uses the same [state-change propagation](#state-change-propagation) mechanism as regular slices, so that all local copies can observe the registry reactively.
 
 The registry pseudo-slice's value contains:
 
@@ -232,7 +232,7 @@ caller ── message ──> service
 - **Parameter** — a single object, validated against the behaviour's parameter schema.
 - **No return** — a behaviour does not produce a result. The caller does not receive a promise.
 - **Delivery guaranteed** — the runtime guarantees the behaviour reaches the target service's processing context. If the service is not active, the runtime activates it (including initialization if required) and delivers the behaviour.
-- **No domain-level rejection** — unlike functions (which can fail with domain errors) and mutations (which can be rejected by invariants), behaviours have no domain-level failure to communicate back. The only failure is runtime failure (service unreachable, worker crash), which is reported through the runtime's error and observability infrastructure, not to the caller.
+- **No domain-level rejection** — unlike functions (which can fail with domain errors), behaviours have no domain-level failure to communicate back. The only failure is runtime failure (service unreachable, worker crash), which is reported through the runtime's error and observability infrastructure, not to the caller.
 - **Queue for later** — the service controls when to act on the behaviour. The runtime delivers it; the service schedules the work. This is fundamentally different from a function, where the service processes the request immediately and returns a result.
 
 Behaviours are distinct from functions whose results happen not to be used. The runtime does not allocate message-correlation state or expect a return envelope for behaviours.
@@ -242,13 +242,11 @@ Behaviours are distinct from functions whose results happen not to be used. The 
 interface ServiceFunctionDeclaration {
   params: z.ZodType;
   returns: z.ZodType;
-  cost?: number;
   description?: string;
 }
 
 interface ServiceBehaviourDeclaration {
   params: z.ZodType;
-  cost?: number;
   description?: string;
   // no returns field — behaviours do not produce results
 }
@@ -641,7 +639,7 @@ interface HostContext {
 
 ## Shared state
 
-The runtime maintains shared reactive state across all execution threads. State is partitioned into named **slices**, each with a schema, invariants, and named **mutations**. A single **state authority** — a colocated service on the broker — holds the authoritative copy, processes mutations, and propagates accepted changes. Each thread holds a **local copy** — an immutable snapshot updated by applying propagated changes, exposed for reactivity through TC39 signals.
+The runtime maintains shared reactive state across all execution threads. State is partitioned into named **slices**, each with a schema and named **mutations**. A single **state authority** — a colocated service on the broker — holds the authoritative copy, processes mutations, and propagates accepted changes. Each thread holds a **local copy** — an immutable snapshot updated by applying propagated changes, exposed for reactivity through TC39 signals.
 
 ### Design context
 
@@ -665,7 +663,6 @@ The shared state is partitioned into named **slices**. Each slice is an independ
   - a **slice identifier** — a unique name;
   - a **schema** — a Zod v4 schema describing the slice's value;
   - **mutations** — a record of named mutation declarations, each with a parameter schema and a transition function;
-  - **invariants** (optional) — zero or more invariant functions, as defined in [Invariants](#invariants).
 - A mutation declaration must include:
   - a **parameter schema** — a Zod v4 schema for the mutation's parameters;
   - a **transition function** — an Immer recipe that receives a draft of the slice's current value and the mutation's parameters, and mutates the draft to produce the next state. The authority derives patches from the transition using Immer's `produceWithPatches` mechanism.
@@ -674,18 +671,15 @@ The shared state is partitioned into named **slices**. Each slice is an independ
 
 ### Slice declaration module convention
 
-A slice's declaration module must follow the `*.slice.ts` naming convention and must export the `SliceDeclaration` as the default export. The authority dynamically imports the declaration module when processing a `SliceRegistration` to obtain the live `SliceDeclaration` (schema, mutations, invariants). Each context that needs the live declaration (for a local copy, for a typed store) imports the module itself.
+A slice's declaration module must follow the `*.slice.ts` naming convention and must export the `SliceDeclaration` as the default export. The authority dynamically imports the declaration module when processing a `SliceRegistration` to obtain the live `SliceDeclaration` (schema, mutations). Each context that needs the live declaration (for a local copy, for a typed store) imports the module itself.
 
-- The declaration module must not import any implementation modules. The slice declaration carries only schemas, transition functions, and invariant functions — all of which are pure. There is no separate implementation module for slices; the transition and invariant functions are the implementation.
+- The declaration module must not import any implementation modules. The slice declaration carries only schemas and transition functions — all of which are pure. There is no separate implementation module for slices; the transition functions are the implementation.
 
 ```ts
 // Zod 4 — declaration-level type illustration
 interface SliceDeclaration<TValue = unknown> {
   id: string;
   schema: z.ZodType<TValue>;
-  invariants?: ReadonlyArray<
-    (proposedValue: TValue, context: InvariantContext) => InvariantVerdict
-  >;
   mutations: Record<string, SliceMutationDeclaration<TValue>>;
 }
 
@@ -699,25 +693,22 @@ interface SliceMutationDeclaration<TValue> {
 
 ### Slice declaration module convention
 
-A slice's declaration module must follow the `*.slice.ts` naming convention and must export the `SliceDeclaration` as the default export. The authority dynamically imports the declaration module when processing a `SliceRegistration` to obtain the live `SliceDeclaration` (schema, mutations, invariants). Each context that needs the live declaration (for a local copy, for a typed store) imports the module itself.
+A slice's declaration module must follow the `*.slice.ts` naming convention and must export the `SliceDeclaration` as the default export. The authority dynamically imports the declaration module when processing a `SliceRegistration` to obtain the live `SliceDeclaration` (schema, mutations). Each context that needs the live declaration (for a local copy, for a typed store) imports the module itself.
 
-- The declaration module must not import any implementation modules. The slice declaration carries only schemas, transition functions, and invariant functions — all of which are pure and serializable within the module's scope. There is no separate implementation module for slices; the transition and invariant functions are the implementation.
+- The declaration module must not import any implementation modules. The slice declaration carries only schemas and transition functions — all of which are pure and serializable within the module's scope. There is no separate implementation module for slices; the transition functions are the implementation.
 
 This specification declares that the following slices exist:
 
-- **`interface`** — the live state of the presented Archive interface. The concrete fields of the `interface` slice, and the conflict-resolution invariants it declares, are established by [UI](./ui.spec.md) as a refinement of this specification and must conform to [Three-way interaction](./three-way-interaction.spec.md). The conflict-resolution rules themselves (User precedence, non-preemption, Guide continuity) are defined by [Three-way interaction](./three-way-interaction.spec.md); the `interface` slice's invariants encode and enforce them, they do not redefine them.
+- **`interface`** — the live state of the presented Archive interface. The concrete fields of the `interface` slice are established by [UI](./ui.spec.md) as a refinement of this specification and must conform to [Three-way interaction](./three-way-interaction.spec.md). The conflict-resolution rules themselves (User precedence, non-preemption, Guide continuity) are defined by [Three-way interaction](./three-way-interaction.spec.md) and are enforced at tool-call dispatch time, as defined by [UI](./ui.spec.md#ui-control-tools).
 - **`session`** — the live session/runtime state not owned by another specification (e.g. interaction status, connection state). The concrete fields of the `session` slice are established by refinement of this specification.
 
-Until a refinement defines a slice's concrete schema, the slice's value is `unknown` and its invariants are empty; the mechanism defined here applies uniformly.
+Until a refinement defines a slice's concrete schema, the slice's value is `unknown`; the mechanism defined here applies uniformly.
 
 ```ts
 // Zod 4 — declaration-level type illustration
 interface SliceDeclaration<TValue = unknown> {
   id: string;
   schema: z.ZodType<TValue>;
-  invariants?: ReadonlyArray<
-    (proposedValue: TValue, context: InvariantContext) => InvariantVerdict
-  >;
   mutations: Record<string, SliceMutationDeclaration<TValue>>;
 }
 
@@ -730,7 +721,7 @@ interface SliceMutationDeclaration<TValue> {
 
 ## State authority
 
-The state authority is a colocated service on the broker (`onBroker: true`). It holds the authoritative copy of every slice, processes mutations, enforces invariants, and propagates accepted changes.
+The state authority is a colocated service on the broker (`onBroker: true`). It holds the authoritative copy of every slice, processes mutations, validates the resulting value against the slice's schema, and propagates accepted changes.
 
 ### Authority responsibilities
 
@@ -748,11 +739,10 @@ When a mutation is submitted to the authority:
 1. The authority must look up the slice and the named mutation in the slice registry.
 2. The authority must validate the mutation's parameters against the mutation's parameter schema.
 3. The authority must apply the mutation's transition function to the authoritative slice value using Immer's `produceWithPatches`, producing the proposed resulting value and the resulting patches.
-4. The authority must validate the proposed resulting value against the slice's Zod schema.
-5. The authority must run every declared invariant function of the slice, as defined in [Invariants](#invariants).
-6. If all succeed, the authority must assign the slice its next monotonic sequence number (current + 1), update the authoritative copy, and propagate the change, as defined in [State-change propagation](#state-change-propagation).
-7. The authority must resolve the mutation call with an acknowledgement carrying the assigned sequence number.
-8. On rejection, the authority must reject the mutation call with an error indicating the rejection reason. No change must be propagated for a rejected mutation.
+4. The authority must validate the proposed resulting value against the slice's Zod schema. A mutation whose resulting value does not conform to the slice's schema must be rejected with a validation error. No change must be propagated for a rejected mutation.
+5. If validation succeeds, the authority must assign the slice its next monotonic sequence number (current + 1), update the authoritative copy, and propagate the change, as defined in [State-change propagation](#state-change-propagation).
+6. The authority must resolve the mutation call with an acknowledgement carrying the assigned sequence number.
+7. On rejection, the authority must reject the mutation call with an error indicating the rejection reason. No change must be propagated for a rejected mutation.
 
 ### Optimistic concurrency
 
@@ -764,14 +754,13 @@ Mutations carry a basis sequence number for optimistic concurrency control. The 
 
 ```gherkin
 Feature: Mutation processing
-  Rule: A mutation is accepted only if its basis is current and the resulting value satisfies schema and invariants
+  Rule: A mutation is accepted only if its basis is current and the resulting value satisfies the slice's schema
 
   Scenario: An accepted mutation is propagated and acknowledged
     Given the authority's current sequence for slice "interface" is 7
     And the store helper submits a mutation with basisSeq 7
     When the authority applies the transition function
     And the resulting value conforms to the schema
-    And all invariant functions accept
     Then the authority must assign sequence 8
     And propagate the change with seq 8
     And resolve the mutation with ack { seq: 8 }
@@ -783,37 +772,12 @@ Feature: Mutation processing
     Then the authority must reject with StaleBasisError
     And must not propagate any change
 
-  Scenario: An invariant-rejected mutation is not propagated
-    Given the Guide commits a mutation to "interface" that conflicts with established User state
-    When the interface slice's conflict-resolution invariant rejects
-    Then the authority must reject with an invariant rejection reason
+  Scenario: A schema-invalid mutation is not propagated
+    Given a mutation to "interface" whose resulting value does not conform to the slice's schema
+    When the authority validates the resulting value
+    Then the authority must reject with a validation error
     And must not propagate any change
 ```
-
-## Invariants
-
-The authority enforces invariants on each mutation before accepting it. There are two invariant categories.
-
-### Schema validity
-
-Every slice has a Zod v4 schema. Schema validity is always enforced.
-
-- The authority must validate the proposed resulting value of the slice against the slice's Zod schema.
-- A mutation whose resulting value does not conform to the slice's schema must be rejected with a validation error.
-
-### Slice invariants
-
-A slice may declare zero or more **invariant functions**. An invariant function receives the proposed resulting value and the mutation's `source` (as defined in [Mutation source](#mutation-source)) and returns a verdict — accept or reject with a reason.
-
-- The authority must run every declared invariant function of the slice after schema validation succeeds.
-- A mutation is accepted only if schema validation succeeds and every invariant function accepts. If any invariant function rejects, the mutation must be rejected with that invariant's reason.
-- Invariant functions must be pure with respect to the proposed resulting value and the mutation's `source`; they must not mutate state or depend on external state.
-
-The motivating use case for slice invariants is **conflict resolution** on the `interface` slice. The `interface` slice's invariants enforce the conflict-resolution rules defined by [Three-way interaction](./three-way-interaction.spec.md) — User precedence, non-preemption of User actions, and Guide continuity — using the mutation's `source` to distinguish User-sourced updates from Guide-sourced updates. The rules themselves are normative in [Three-way interaction](./three-way-interaction.spec.md); this specification requires only that the `interface` slice declare invariants that enforce them, and defines the mechanism by which they are enforced. The concrete `interface` slice invariants are established by [UI](./ui.spec.md).
-
-### Mutation source
-
-A mutation carries a `source` — the actor committing the mutation: `ui`, `guide`, or `service`. The `source` is made available to invariant functions so conflict-resolution invariants can distinguish User-sourced from Guide-sourced updates.
 
 ## State-change propagation
 
@@ -951,7 +915,7 @@ A store exposes:
   - embeds the local copy's current sequence number as the `basisSeq` transparently;
   - calls the authority's `mutate` function with the slice, mutation name, parameters, and basis sequence;
   - on `StaleBasisError`, waits for the local copy to converge and retries with the new basis sequence (up to a bounded number of retries);
-  - resolves the consumer's promise with the ack on success, or rejects with the real error (validation error, invariant rejection) on failure.
+  - resolves the consumer's promise with the ack on success, or rejects with the real error (validation error) on failure.
 
 The consumer does not see basis sequences, stale-basis errors, or retry logic. The consumer calls `store.navigate({...})` and gets an ack or a real error.
 
@@ -972,7 +936,7 @@ The runtime is the execution substrate for several other specifications:
 - **Retrieval** — the retrieval interface, as defined by [Content-first retrieval](./content-first-retrieval.spec.md), is accessed through services on the runtime. The block store, property index, text index, relationship index, and containment index are backed by services.
 - **Agentic model** — the agentic model (events, queue, flush, interaction triggering, budget), as defined by [Constrained agent](./constrained-agent.spec.md), produces and queues events and triggers interactions. The Guide agent loop runs as a service on the runtime. Agentic event dispatch uses behaviours; interaction requests use behaviours, decoupling the UI from the Guide's processing.
 - **Safety consultation** — the `safety_consult` tool, as defined by [Agent safety](./agent-safety.spec.md), invokes a safety consultant service through the runtime.
-- **Shared state** — the `interface` slice's concrete fields and conflict-resolution invariants are established by [UI](./ui.spec.md) as a refinement of this specification. The conflict-resolution rules are defined by [Three-way interaction](./three-way-interaction.spec.md).
+- **Shared state** — the `interface` slice's concrete fields are established by [UI](./ui.spec.md) as a refinement of this specification. The conflict-resolution rules are defined by [Three-way interaction](./three-way-interaction.spec.md) and enforced at tool-call dispatch time, as defined by [UI](./ui.spec.md#ui-control-tools).
 - **Deployment topology** — the worker topology in which the runtime operates is defined by [Usage and deployment](./usage-and-deployment.spec.md).
 
 This specification defines the runtime; the specific services are defined by their respective domain specifications.
@@ -1010,7 +974,7 @@ An implementation conforms to this specification when:
 - Transferable objects in message bodies are identified by the proxy factory and listed in the head's `transferables` field, which is passed verbatim as the `transfer` parameter to `postMessage`;
 - a service with `requiredSlices` declared enters `activating_1` after instantiation and must not progress until all listed slices are loaded; a service with an `initializer` declared enters `activating_2` after required slices are available and must not progress until the initializer behaviour is delivered and completed; the initializer is guaranteed to be the first invocation the service receives once all required slices are available;
 - the host processes messages to a given service strictly in delivery order (per-service serialisation); different services on the same host may process concurrently;
-- the state authority is a colocated service on the broker, holds the authoritative copy of every slice and the registry pseudo-slice, serialises mutations, enforces schema validity and slice invariants, and propagates accepted changes;
+- the state authority is a colocated service on the broker, holds the authoritative copy of every slice and the registry pseudo-slice, serialises mutations, validates the resulting value against the slice's schema, and propagates accepted changes;
 - mutations are named, typed state-transition functions (Immer recipes); the authority derives patches internally and propagates them;
 - optimistic concurrency is enforced via a basis sequence number embedded transparently by the store interface; `StaleBasisError` is retried transparently after local copy convergence;
 - local copies fetch initial snapshots on boot, apply propagated changes in sequence, recover from gaps, and expose reads through TC39 signals;

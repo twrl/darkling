@@ -1,0 +1,28 @@
+{
+  "name": "@darkling/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./broker-worker": "./src/broker-worker.ts",
+    "./host-worker": "./src/host-worker.ts",
+    "./state-authority-service": "./src/state-authority/state-authority.service.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "dependencies": {
+    "@darkling/observability": "workspace:*",
+    "immer": "^10.1.7",
+    "signal-polyfill": "^0.2.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {},
+  "peerDependenciesMeta": {},
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*"
+  }
+}

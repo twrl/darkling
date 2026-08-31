@@ -40,14 +40,12 @@ The user selected all six proposed event types: `document_opened`, `document_clo
 - `scroll` is the low-level browsing signal that drives microbatching (low trigger probability), carrying the blocks brought into view.
 - The spec explicitly states the Guide does not produce events, and internal UI state changes (animation completion, cache updates) do not produce events — closing a loophole the existing specs left open.
 
-### `interface` slice: concrete fields + User-precedence invariant
+### `interface` slice: concrete fields + User-precedence enforcement
 
-This spec is the refinement of `state-manager.spec.md` that establishes the `interface` slice's concrete fields and invariants (the deferred refinement noted in `state-manager.journal.md`).
+This spec is the refinement of `runtime.spec.md` that establishes the `interface` slice's concrete fields (the deferred refinement noted in `state-manager.journal.md`).
 
 - **Fields:** `stack` (ordered open documents, front = active), `activeDocument` (front-most, nullable), `focus` (block focused within the active document, nullable). No attention field (transient). No speech field (delivered by avatar-interaction tools, not held in shared state).
-- **Invariants:** internal consistency (activeDocument == stack[0], focus within activeDocument); **User precedence** (a guide-sourced proposal must not override the active document a ui-sourced action has most recently established, tracked via authority-side `uiEstablishedActiveDocument` state outside the broadcast value); active-document focus.
-
-The User-precedence invariant is the mechanism by which the three-way conflict-resolution rules (User precedence, non-preemption, Guide continuity) are *enforced at the state level*, rather than resolved ad hoc by the UI. A Guide `navigate` conflicting with a Visitor's established navigation is rejected with `StateInvariantError`; the Guide's tool call fails and it must handle the failure (acknowledging the interruption in-character, per Guide continuity). This realises the "must yield" requirement of `three-way-interaction.spec.md` through the state manager, which is what `state-manager.spec.md`'s journal anticipated ("the `interface` slice's invariants encode and enforce [the three-way rules]").
+- **User precedence** is enforced at `navigate` tool-call dispatch time, not by runtime state invariants. The `navigate` dispatch inspects the current stack (each tablet's `openedBy`) and rejects a Guide navigation that would override a `ui`-opened active document. This keeps the runtime authority simple and locates conflict resolution where the Guide's action is initiated.
 
 ### `uiEstablishedActiveDocument` is authority-side state, not in the broadcast value
 
@@ -57,9 +55,9 @@ The User-precedence invariant is the mechanism by which the three-way conflict-r
 
 Resolved the `uiEstablishedActiveDocument` gap, per the user: "we have a stack of open tablets, we simply include 'how opened' on each one. That stack is sent to the agent on each interaction, and we enforce restrictions on navigation at tool call time."
 
-- **`openedBy` on each stack entry.** Each tablet in the `interface` slice's `stack` now carries `openedBy: UpdateSource` (`ui` | `guide` | `service`), recording who opened it. It's set when the tablet is pushed and doesn't change while the tablet stays in the stack (bringing forward doesn't change `openedBy`). This is part of the broadcast slice value, so it's visible to local copies and to the Guide (the Guide sees how each open document was opened).
-- **Enforcement moved to `navigate` tool dispatch.** User precedence is now enforced at `navigate` tool-call dispatch time, not by a state-manager invariant. The `navigate` dispatch inspects the current stack: if the active document's tablet has `openedBy: "ui"` and the call would change `activeDocument` away from it, the call is rejected with a clear error ("the Visitor opened that document"); a call targeting the current `ui`-opened active document (e.g. focusing a block within it) is accepted. A surviving call is then proposed as a `guide`-sourced `interface` slice update.
-- **State-manager invariants stay pure.** The `interface` slice's invariants are now just internal consistency (activeDocument == stack[0], focus within activeDocument). No authority-side `uiEstablishedActiveDocument` state is needed, and the state-manager's invariant purity rule ("must not mutate state or depend on external state") is **not** contradicted. The flagged `state-manager.spec.md` refinement is no longer required.
+- **`openedBy` on each stack entry.** Each tablet in the `interface` slice's `stack` now carries `openedBy: 'ui' | 'guide' | 'service'`, recording who opened it. It's set when the tablet is pushed and doesn't change while the tablet stays in the stack (bringing forward doesn't change `openedBy`). This is part of the broadcast slice value, so it's visible to local copies and to the Guide (the Guide sees how each open document was opened). The `openedBy` enum is a UI domain concept defined inline in this spec, not a runtime type.
+- **Enforcement moved to `navigate` tool dispatch.** User precedence is now enforced at `navigate` tool-call dispatch time, not by a runtime state invariant. The `navigate` dispatch inspects the current stack: if the active document's tablet has `openedBy: "ui"` and the call would change `activeDocument` away from it, the call is rejected with a clear error ("the Visitor opened that document"); a call targeting the current `ui`-opened active document (e.g. focusing a block within it) is accepted. A surviving call then proposes an `interface` slice update, setting `openedBy: "guide"` on any tablet it pushes.
+- **No runtime invariants needed.** The `interface` slice does not declare invariant functions. Internal consistency (`activeDocument` == `stack[0]`, `focus` within `activeDocument`) is maintained by the mutations themselves, which are the only mechanism for changing the slice's value. No authority-side `uiEstablishedActiveDocument` state is needed. The flagged `state-manager.spec.md` refinement is no longer required.
 - **Why this is cleaner.** Locating conflict resolution at tool-call dispatch (where the Guide's action is initiated) matches the `draw_attention`-on-inactive-document pattern already in the spec, gives the Guide a recoverable failure with a clear reason, keeps the state-manager authority simple and pure, and uses the stack the Guide already observes. The Guide can see which documents the Visitor opened and reason about yielding in-character (Guide continuity), rather than the failure being an opaque state rejection.
 
 This superseded the earlier "User-precedence invariant + `uiEstablishedActiveDocument` authority-side state" design. The earlier design's journal entries are struck through above for history.
@@ -68,7 +66,7 @@ This superseded the earlier "User-precedence invariant + `uiEstablishedActiveDoc
 
 The spec defines the two UI-control tools backing the Guide's Navigate and Draw-attention operations, as deferred by `constrained-agent.spec.md` ("specific tools for... UI control are defined by their respective domain specifications").
 
-- `navigate({ document, block? })` proposes an `interface` slice update with `source: "guide"`, subject to conflict-resolution invariants. Visible.
+- `navigate({ document, block? })` proposes an `interface` slice update, setting `openedBy: "guide"` on any tablet it pushes, subject to User-precedence enforcement at dispatch time. Visible.
 - `draw_attention({ document, block })` renders a transient highlight, dispatches the transient effect directly (does **not** propose an `interface` update), and fails if the target document is not the active document. Visible (transient).
 
 The `draw_attention`-on-inactive-document failure is a defined error that tells the Guide it must navigate first — this gives the constrained agent a recoverable failure rather than a silent no-op.
@@ -143,9 +141,9 @@ The user selected: event types & payloads, the rendering pipeline, the `interfac
 ## Overlaps with other specifications
 
 - `constrained-agent.spec.md` — owns the queue/flush/trigger/budget (formerly the event system spec, now consolidated into the constrained agent spec); this spec owns the event *types* and payloads it keys off. `direct_address` trigger probability 1.0 aligns with its examples.
-- `three-way-interaction.spec.md` — owns the roles, permitted operations (Navigate, Draw attention, Retrieve), and conflict-resolution rules. This spec defines the *rendering* of those operations and the *mechanism* (the `interface` slice invariants) that enforces the rules, not the rules.
+- `three-way-interaction.spec.md` — owns the roles, permitted operations (Navigate, Draw attention, Retrieve), and conflict-resolution rules. This spec defines the *rendering* of those operations and enforces the rules at tool-call dispatch time, not via runtime state invariants.
 - `constrained-agent.spec.md` — owns the tool categories and discipline. This spec defines the specific `navigate`/`draw_attention` UI-control tools deferred by it.
-- `state-manager.spec.md` — owns the authority/local-copy/patch mechanism. This spec refines the `interface` slice's fields and invariants within that mechanism (the deferred refinement).
+- `runtime.spec.md` — owns the authority/local-copy/patch mechanism. This spec refines the `interface` slice's fields within that mechanism (the deferred refinement).
 - `content-model.spec.md` / `authoring-tooling.spec.md` — own the document/block/relationship model and the compiled Markdown format. This spec renders them.
 - `content-first-retrieval.spec.md` — owns the retrieval interface (used by the Guide, not directly by the UI). This spec uses the ToC (owned by `usage-and-deployment.spec.md`) for Visitor navigation.
 - `usage-and-deployment.spec.md` — owns the runtime topology (main thread, workers), Service Worker, cap enforcement, and ToC. This spec conforms to its main-thread requirement and presents the cap in-world.
