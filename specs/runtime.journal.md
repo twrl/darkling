@@ -197,3 +197,9 @@ The following specifications reference the former Service Bus or State Manager a
 - **Schema transport** — the spec requires schemas in declarations but does not define how schemas are serialised between broker and hosts (they import the declaration module directly).
 - **Host-to-host communication** — the spec defines broker-to-host communication but does not address whether hosts can communicate directly or must route through the broker.
 - **Runtime events (generic pub/sub)** — deferred. May be added as a refinement if a genuine need emerges.
+
+## Bootstrap orchestration moved here from Usage and deployment
+
+After the usage-and-deployment spec was refocused on assembly and deployment, the detailed bootstrap sequence had no clear home. The user chose to place the bootstrap orchestration in this specification, since the sequence is primarily about starting the runtime and its services. A new [Bootstrap](#bootstrap) section was added, defining the ordered sequence: Service Worker activation (defined by UI), runtime creation, slice registration, service registration, service initialization, UI mount, `session_start` emission, and Guide operation.
+
+The ordering is normative where dependencies require it (broker before service registration; slices before services that require them; services initialized before receiving calls; UI mounted before `session_start`); independent steps may proceed concurrently. The purpose-and-scope and relationship-to-other-specs sections were updated, and a conformance bullet was added. The deployment-level topology (what runs on the frontend vs the backend) remains in usage-and-deployment; this spec owns the in-frontend worker placement and now the bootstrap orchestration.

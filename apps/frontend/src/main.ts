@@ -2,7 +2,7 @@
  * The frontend entry point: imports the UI components, the worker host elements,
  * and mounts the <darkling-app>.
  *
- * @see specs/usage-and-deployment.spec.md#bootstrap-sequence
+ * @see specs/runtime.spec.md#bootstrap
  */
 
 import './ui/darkling-app.js';
@@ -72,7 +72,7 @@ if (busHost && stateHost) {
 }
 
 // Register the Service Worker for transparent token handling, as defined by
-// [Usage and deployment](../../specs/usage-and-deployment.spec.md#service-worker).
+// [User interface](../../specs/ui.spec.md#service-worker).
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker

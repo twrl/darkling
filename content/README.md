@@ -5,7 +5,7 @@ This directory holds Archive source material for **development and testing**.
 Live content is maintained in a **separate git repository** and compiled by the
 backend at runtime, as defined by
 [Authoring tooling](../specs/authoring-tooling.spec.md#content-sources) and
-[Content lifecycle](../specs/usage-and-deployment.spec.md#content-lifecycle).
+[Content sources and publishing workflows](../specs/usage-and-deployment.spec.md#content-sources-and-publishing-workflows).
 This directory is a stand-in for that external repository, so the backend can
 be run locally without cloning the real content repo.
 

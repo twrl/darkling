@@ -60,3 +60,16 @@ The configuration source abstraction mirrors the `ContentSource` pattern establi
 - **Configuration source interface shape.** The spec requires a configuration source abstraction but does not prescribe its interface shape (e.g. `get(key)`, typed accessors per subsystem, a resolved config object). This is deliberately left to implementation, consistent with the "framework only" scope decision. It may warrant clarification when the first implementation is built.
 - **Future policy parameters.** The user noted "several more in mind" beyond those already mentioned. When those are established in their domain specs, they link to this spec and satisfy its contract. The spec is ready to receive them.
 - **Dynamic adjustment.** Explicitly out of scope. If runtime-adjustable policy values become needed (e.g. budget tuning in response to load), a spec change would be required to add a notification/invalidation contract.
+
+## Narrowing — delivery mechanism moved to Usage and deployment
+
+After the usage-and-deployment spec was refocused on assembly and deployment (see its journal), the configuration delivery mechanism — configuration source, default profile, resolution order, and static resolution — was moved from this specification into [Usage and deployment](./usage-and-deployment.spec.md#application-configuration-api). This specification now owns only the cross-cutting structural contract for policy parameters (existence, defined value, type, documentation).
+
+The user initially proposed full absorption (deleting this spec and moving the structural contract into usage-and-deployment too). On review, the user chose to keep this specification as the home for the structural contract, because it is a genuinely cross-cutting concern referenced by 6+ domain specs, and putting it inside the deployment spec would recreate the "architectural dumping ground" problem the usage-and-deployment refactoring was intended to fix. Only the instance-facing delivery mechanism moved.
+
+Consequences:
+
+- Domain specs that define policy parameters now link to this spec for the structural contract and to usage-and-deployment for the delivery mechanism.
+- The constrained-agent spec's "Policy parameters" preamble was updated to split its reference: structural contract here, delivery mechanism in usage-and-deployment.
+- The Gherkin scenarios for the moved sections were relocated to usage-and-deployment.
+- This spec's Conformance section was narrowed to the structural contract; the delivery-mechanism conformance requirements are now in usage-and-deployment.

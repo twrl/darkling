@@ -197,3 +197,11 @@ in Trigger probability + a flush scenario; formerly event-system.spec.md), and u
 (a bootstrap-sequence step + a Gherkin assertion). The constrained-agent
 spec's interaction input shape is unchanged — `session_start` appears in the
 event queue like any other event.
+
+## Service Worker token handling moved here from Usage and deployment
+
+After the usage-and-deployment spec was refocused on assembly and deployment, the Service Worker token-lifecycle mechanics had no clear home. The user chose to place them in this specification, since the UI spec already owns the frontend's main-thread behaviour and `session_start` (bootstrap completion), and token handling is a frontend-browser concern.
+
+A new [Service Worker](#service-worker) section was added, defining: token lifecycle (activation, attachment to backend requests, refresh and expiry, token isolation — not visible to the page, not in a cookie), application-code unawareness, and bootstrap ordering (Service Worker activates and obtains a token before the runtime starts, as the first step of the runtime's bootstrap sequence). The purpose-and-scope section now lists the Service Worker as governed; the out-of-scope bullet that deferred "the Service Worker, and token handling" to usage-and-deployment was corrected to defer only the deployment-level topology. Broken cross-references to the removed usage-and-deployment `#main-thread` and `#client-side-retrieval-and-caching` sections were repointed to the runtime worker-topology section and the content-first-retrieval client-side-caching section respectively. A conformance bullet for the Service Worker was added.
+
+The access model (secret-for-token exchange, tiers, no logon flow) remains in usage-and-deployment; this spec owns the Service Worker mechanics that realise transparent token handling in the browser.

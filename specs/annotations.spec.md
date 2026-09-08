@@ -82,11 +82,13 @@ Each annotation has a topic — a label that links it to a subject or theme.
 
 ### Relationship to the Guide's personality
 
-Annotations carry the Guide's subjective perspective: opinions, affective cues, and private recollections. They are the authored source of the Guide's personality and voice.
+Annotations carry the Guide's subjective perspective: opinions, affective cues, and private recollections. They are the authored source of the Guide's personality and voice as expressed toward specific Archive content.
 
 - Annotations are authored content, not runtime-generated. The Guide's opinions and recollections are established by the author, not invented by the model at runtime.
 - The Guide may express the content of an annotation in its responses, but the annotation itself is private: it is not shown to the User as Archive content. The Guide's response is its own; the annotation is the source material behind it.
 - Annotations are not part of the Archive's record. A User reading the Archive does not see annotations; only the Guide has access to them.
+
+Annotations are distinct from the Guide definition: the Guide definition is the Guide's standing personality, voice, and safety posture, applied to every interaction, as defined by [Usage and deployment](./usage-and-deployment.spec.md#guide-definition). Annotations are topic-linked notes on specific content, retrieved at runtime. The backend composes the prompt from both, alongside the constrained-agent framing.
 
 ## Authoring and lifecycle
 

@@ -3,7 +3,7 @@
  * on the bus, as defined by [Service registration](../../specs/service-bus.spec.md#service-registration).
  *
  * The Guide agent loop runs in a dedicated Web Worker, as defined by
- * [Runtime topology](../../specs/usage-and-deployment.spec.md#runtime-topology).
+ * [Runtime](../../specs/runtime.spec.md#worker-topology).
  * Running it as a bus service lets the host (the frontend main thread) trigger
  * interactions over the bus and receive outcomes, while the loop is isolated
  * from the main thread.

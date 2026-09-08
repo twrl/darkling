@@ -3,7 +3,7 @@
  * webhook. The initial implementation uses a filesystem `ContentSource` rooted
  * at a configured directory (the git working copy the backend accesses).
  *
- * @see specs/usage-and-deployment.spec.md#content-lifecycle
+ * @see specs/usage-and-deployment.spec.md#content-sources-and-publishing-workflows
  * @see specs/authoring-tooling.spec.md
  */
 

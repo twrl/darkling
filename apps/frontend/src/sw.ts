@@ -6,7 +6,7 @@
  * the token lifecycle (exchange, refresh, expiry). The token is not visible
  * to the page and is not carried in a cookie.
  *
- * @see specs/usage-and-deployment.spec.md#service-worker
+ * @see specs/ui.spec.md#service-worker
  * @see specs/usage-and-deployment.spec.md#access-and-authentication
  */
 

@@ -29,7 +29,7 @@ Where this specification depends on behaviour defined by those specifications, i
 
 [Usage and deployment](../../specs/usage-and-deployment.spec.md) defines the backend's responsibilities (LLM proxy, content compilation and retrieval, access/auth, cost/abuse controls), the runtime topology, and the session model. This specification defines the app that implements those requirements.
 
-The HTTP wire format for retrieval, the ToC, and the cache-invalidation list is **not** defined normatively by any existing specification — [Usage and deployment](../../specs/usage-and-deployment.spec.md#client-side-retrieval-and-caching) explicitly defers the `since`/invalidation-list interface to [Content-first retrieval](../../specs/content-first-retrieval.spec.md), to be established via the specification workflow. This specification defines a wire format as an **implementation decision** (recorded in [package.journal.md](./package.journal.md)), to be ratified by a future refinement of [Content-first retrieval](../../specs/content-first-retrieval.spec.md). If the ratified format differs, the app is updated to conform.
+The HTTP wire format for retrieval, the ToC, and the cache-invalidation list is **not** defined normatively by any existing specification — [Content-first retrieval](../../specs/content-first-retrieval.spec.md#client-side-caching) defines the cache invalidation interface (`since` parameter + invalidation list). This specification defines a wire format as an **implementation decision** (recorded in [package.journal.md](./package.journal.md)), conforming to that interface. If a future refinement of [Content-first retrieval](../../specs/content-first-retrieval.spec.md) changes the interface, the app is updated to conform.
 
 ## Public API surface
 
@@ -62,9 +62,9 @@ The retrieval HTTP API mirrors the nine retrieval operations exposed by the `@da
 | `GET` | `/retrieval/traverse-inbound/:blockId` | `?typeFilter=&limit=&cursor=` | `PageResult<TraversalResult>` |
 | `GET` | `/retrieval/toc` | — | `Array<{ id, slug, title }>` |
 
-All retrieval endpoints accept an optional `since` query parameter (a Unix epoch timestamp in milliseconds). When present, the response is wrapped in `{ result: <result>, invalid: { documents: string[], blocks: string[] }, asOf: number }`, where `invalid` lists the IDs of documents and blocks added/modified/removed since `since`, and `asOf` is the timestamp to use as the next `since`. When `since` is absent, the endpoint returns the result shape directly (no invalidation list). This is the `since`/invalidation-list mechanism required by [Usage and deployment](../../specs/usage-and-deployment.spec.md#client-side-retrieval-and-caching); the exact JSON shape is an implementation decision pending ratification by [Content-first retrieval](../../specs/content-first-retrieval.spec.md).
+All retrieval endpoints accept an optional `since` query parameter (a Unix epoch timestamp in milliseconds). When present, the response is wrapped in `{ result: <result>, invalid: { documents: string[], blocks: string[] }, asOf: number }`, where `invalid` lists the IDs of documents and blocks added/modified/removed since `since`, and `asOf` is the timestamp to use as the next `since`. When `since` is absent, the endpoint returns the result shape directly (no invalidation list). This is the `since`/invalidation-list mechanism defined by [Content-first retrieval](../../specs/content-first-retrieval.spec.md#client-side-caching); the exact JSON shape is an implementation decision conforming to that interface.
 
-The ToC endpoint returns the document-level index (document IDs, slugs, titles — no block content), as defined by [Usage and deployment](../../specs/usage-and-deployment.spec.md#client-side-retrieval-and-caching).
+The ToC endpoint returns the document-level index (document IDs, slugs, titles — no block content), as defined by [Content-first retrieval](../../specs/content-first-retrieval.spec.md#client-side-caching).
 
 ### Access and authentication
 
@@ -82,7 +82,7 @@ Token validation middleware validates the `Authorization: Bearer <token>` header
 | --- | --- | --- | --- |
 | `POST` | `/webhook/compile` | (implementation-defined) | `204 No Content` |
 
-Triggers recompilation of the content source into the persistent store, as defined by [Content lifecycle](../../specs/usage-and-deployment.spec.md#content-lifecycle). The webhook payload format and file-mapping is an implementation concern. The initial implementation recompiles the entire content source on each webhook (no incremental file-mapping).
+Triggers recompilation of the content source into the persistent store, as defined by [Content sources and publishing workflows](../../specs/usage-and-deployment.spec.md#content-sources-and-publishing-workflows). The webhook payload format and file-mapping is an implementation concern. The initial implementation recompiles the entire content source on each webhook (no incremental file-mapping).
 
 ## Persistent store
 
@@ -134,7 +134,7 @@ The app conforms to [Usage and deployment](../../specs/usage-and-deployment.spec
 
 - it proxies LLM calls through the configured provider, holding the API key server-side, as defined by [LLM proxy](../../specs/usage-and-deployment.spec.md#llm-proxy);
 - it serves retrieval from the persistent store over HTTP, returning the `@darkling/knowledge-base` result shapes, as defined by [Backend responsibilities](../../specs/usage-and-deployment.spec.md#backend-responsibilities);
-- it compiles source Markdown into the persistent store on webhook, as defined by [Content lifecycle](../../specs/usage-and-deployment.spec.md#content-lifecycle);
+- it compiles source Markdown into the persistent store on webhook, as defined by [Content sources and publishing workflows](../../specs/usage-and-deployment.spec.md#content-sources-and-publishing-workflows);
 - it issues and validates tiered tokens via secret exchange, with no logon UI, as defined by [Access and authentication](../../specs/usage-and-deployment.spec.md#access-and-authentication);
 - it enforces per-session spend caps and global rate limits per tier, as defined by [Cost and abuse controls](../../specs/usage-and-deployment.spec.md#cost-and-abuse-controls);
 - it is stateless per-invocation (the in-memory initial store is a process-local cache pending the Redis-backed production store), as defined by [Deployment shape](../../specs/usage-and-deployment.spec.md#deployment-shape).

@@ -156,3 +156,254 @@ responding" without producing any event to trigger the first interaction.
 The event type is owned by the UI spec (ui.spec.md#session-start); the framing
 (Visitor-initiated, not a system event) and the empty payload / once-per-load /
 emitted-before-Visitor-input decisions are recorded in ui.journal.md.
+
+## Purpose and scope revision — assembly and deployment framing
+
+The user reviewed the spec and found the original purpose and scope unclear,
+resulting in the spec becoming an "architectural dumping ground" that captured
+operational architecture rather than the intended developer-facing usage (DX)
+concern: how the reusable Darkling software is assembled with project-specific
+content, Guide definition, and configuration to produce a deployable instance.
+
+A revised purpose and scope was established via the specification workflow,
+refocusing the spec on assembly and deployment. The revised scope governs:
+
+- the structure and entry point of a Darkling instance;
+- the application configuration API and its conventions and defaults;
+- the composition of the runtime with Archive content and Guide definition;
+- supported content sources and their publishing workflows;
+- the build and packaging process for supported deployment targets;
+- the runtime topology and external dependencies required by a deployed
+  instance;
+- deployment and operational configuration;
+- persistence, access, and resource controls as they apply to a deployed
+  instance.
+
+The supported deployment targets are now explicitly enumerated: Vercel (hosted)
+and local Node.js (development and operation).
+
+### Scope decisions made through dialogue
+
+Four scope boundary questions were resolved with the user:
+
+1. **Runtime topology — deployment-shape only.** The detailed worker-placement
+   rules (broker/Guide/retrieval in dedicated workers, UI on main thread,
+   Service Worker) were removed from this spec. They are governed by
+   [Runtime](./runtime.spec.md) and [User interface](./ui.spec.md). This spec
+   retains only the deployment-level topology: what runs on the frontend vs the
+   backend, and the external dependencies. The scope bullet is worded as
+   "runtime topology and external dependencies required by a deployed instance"
+   to avoid tension with the out-of-scope clause on component internals.
+
+2. **Guide definition — defined minimally here.** The Guide definition is
+   established as a first-class assembly input: the project-specific definition
+   of the Guide's personality, voice, and in-fiction behaviour, distinct from
+   the constrained-agent mechanics. It shapes the Guide's responses without
+   altering the agentic model. Its specific structure (fields, prompt rendering,
+   relationship to the status object) is left to be established via the
+   specification workflow. Where it references content, it does so through the
+   same compiled content model and retrieval interface.
+
+3. **Configuration — this spec owns config holistically.** This spec now owns
+   the developer-facing configuration API (entry point, conventions, defaults,
+   sources, resolution) for a Darkling instance. The cross-cutting structural
+   contract for policy parameters (existence, defined value, type,
+   documentation, provision to subsystems) remains with
+   [Policy and configuration](./policy-and-configuration.spec.md). This is the
+   biggest cross-spec implication: policy-and-configuration narrows to parameter
+   structure, and this spec becomes the home for the instance-level
+   configuration model. That narrowing is a flagged follow-up, not done in this
+   pass.
+
+4. **Operational detail — moved out entirely.** Detailed operational sections
+   were relocated or pruned:
+   - the client-side retrieval caching mechanism (cache, prefetch, invalidation
+     list, ToC, offline) moves to [Content-first retrieval](./content-first-retrieval.spec.md);
+   - the per-tier session state persistence mechanism detail moves to
+     [Constrained agent](./constrained-agent.spec.md) (the link reverses: this
+     spec now states the policy is per-tier configurable, and references the
+     constrained agent for the mechanism);
+   - the detailed bootstrap sequence moves to [Runtime](./runtime.spec.md) and
+     [User interface](./ui.spec.md); this spec requires only that the frontend
+     application provides an entry point that assembles and starts the instance;
+   - the Service Worker token-lifecycle mechanics are stated at requirement
+     level (transparent handling, application code unaware); the detailed
+     lifecycle (activation, exchange, refresh, expiry) is an implementation
+     concern of the frontend application.
+
+### New sections
+
+- **Deployment targets** — enumerates Vercel and local Node.js with their
+  characteristics, and requires that local matches hosted observable behaviour.
+- **Instance structure and entry point** — defines the frontend application and
+  backend application as the application author's entry points, and the
+  Visitor-facing and content webhook entry points.
+- **Composition** — defines the three project-specific inputs (Archive content,
+  Guide definition, configuration) and the composition boundary.
+- **Application configuration API** — owns the configuration model: sources
+  (content repo + deployment env), the developer-facing API (typed config
+  object, conventions, defaults, validation, provision to subsystems),
+  configuration caching, and resolution at startup. Absorbs the former
+  Configuration section.
+- **Content sources and publishing workflows** — replaces the former Content
+  lifecycle, framed at the publishing-workflow level (git repo + webhook-
+  triggered recompilation).
+- **Build and packaging** — new; defines the frontend Vite build, backend
+  packaging, and target-specific build configuration, requiring the same
+  codebase builds for both targets.
+- **Runtime topology and external dependencies** — replaces the former detailed
+  Runtime topology with a deployment-level statement plus the external
+  dependencies (LLM provider, persistent/secret/usage stores).
+
+### Gaps and follow-ups flagged for the user
+
+- **policy-and-configuration.spec.md narrowing.** This spec now owns the
+  instance-level configuration model; policy-and-configuration should narrow to
+  parameter structure. Not done in this pass.
+- **constrained-agent.spec.md picks up per-tier persistence mechanism.** The
+  detailed per-tier session state persistence mechanism (storage location,
+  carryover shape) should land in the constrained agent spec. Not done in this
+  pass.
+- **content-first-retrieval.spec.md picks up client-side caching.** The
+  client-side caching + invalidation mechanism (its journal already anticipates
+  the invalidation interface) should land in the retrieval spec. Not done in
+  this pass.
+- **Service Worker token-lifecycle mechanics and detailed bootstrap sequence
+  have no clear existing home.** These are gaps for the user to decide where
+  they land (possibly future spec work, or the UI/runtime specs).
+- **Guide definition structure.** The specific structure of the Guide definition
+  is to be established via the specification workflow.
+- **Configuration API shape.** The specific shape of the configuration object
+  (fields, types, defaults) is to be established via the specification
+  workflow.
+
+## Follow-up: delivery mechanism absorbed from Policy and configuration
+
+Resolved the biggest flagged follow-up: the configuration delivery mechanism
+(configuration source, default profile, resolution order, static resolution)
+was moved from [Policy and configuration](./policy-and-configuration.spec.md)
+into this specification's [Application configuration API](#application-configuration-api)
+section.
+
+The user initially chose full absorption (deleting policy-and-configuration and
+moving its structural contract here too). On review, the user reversed to
+"move resolution only": policy-and-configuration keeps the cross-cutting
+structural contract for policy parameters (existence, defined value, type,
+documentation), which 6+ domain specs reference; only the instance-facing
+delivery mechanism moved. This avoids recreating the "architectural dumping
+ground" problem in the deployment spec.
+
+The Application configuration API section now contains: configuration source
+(+ provision to subsystems), configuration sources (content repo + deployment
+env), the configuration API (typed object, conventions, defaults, validation),
+configuration caching, default profile, resolution order, static resolution,
+and resolution at startup — with the Gherkin scenarios for each. The
+constrained-agent spec's "Policy parameters" preamble was updated to split its
+reference: structural contract in policy-and-configuration, delivery mechanism
+here.
+
+## Follow-up: per-tier persistence mechanism moved to Constrained agent
+
+Resolved the second flagged follow-up: the per-tier session state persistence
+*mechanism* (what persists, how it is stored, the carryover shape) was moved
+into [Constrained agent](./constrained-agent.spec.md#persistence-and-scope).
+The link reversed: previously the constrained agent spec referenced this spec
+for the implementation policy; now this spec states the deployment-level policy
+(per-tier configurable persistence) and references the constrained agent for
+the mechanism.
+
+The constrained agent's "Persistence and scope" section now owns: the working
+memory value as the unit of persistence; persistent tiers restoring the prior
+value on return visits, ephemeral tiers discarding it; per-browser scope;
+clearing site data resets regardless of tier; the budget carryover following
+the same per-tier policy with its carryover shape owned by the constrained
+agent. New Gherkin scenarios for persistent/ephemeral restoration were added
+there. This spec's session model section and its relationship-to-other-specs
+entry were updated accordingly.
+
+## Follow-up: client-side caching mechanism moved to Content-first retrieval
+
+Resolved the third flagged follow-up: the client-side caching mechanism (cache,
+prefetch, cache invalidation via `since` parameter + invalidation list, table
+of contents, offline, bundled fallback) was moved into
+[Content-first retrieval](./content-first-retrieval.spec.md#client-side-caching).
+This resolves the "cache invalidation interface" gap noted in the
+content-first-retrieval journal: the `since` parameter and invalidation-list
+result shape are now defined there.
+
+This spec retains only the deployment-level topology (retrieval executes on the
+backend; the frontend's retrieval service is backed by HTTP-client providers)
+and the external persistent-store dependency. The relationship-to-other-specs
+entry for content-first-retrieval was updated to reflect the new ownership
+boundary.
+
+## Follow-up: Service Worker mechanics and bootstrap orchestration relocated
+
+Resolved the fourth flagged follow-up (the two gaps with no existing home):
+
+- **Service Worker token-lifecycle mechanics** moved to [UI](./ui.spec.md#service-worker).
+  The access model (secret-for-token exchange, tiers, no logon flow) stays here;
+  the UI spec owns the browser-side mechanics (activation, attachment, refresh,
+  expiry, token isolation). This spec's Token handling subsection now references
+  the UI spec for the mechanics.
+- **Bootstrap orchestration** moved to [Runtime](./runtime.spec.md#bootstrap).
+  The runtime spec owns the ordered sequence (Service Worker activation, runtime
+  creation, slice/service registration, service initialization, UI mount,
+  session_start). This spec requires only that the frontend application provides
+  an entry point that assembles and starts the instance.
+
+The relationship-to-other-specs entries for Runtime and UI were updated
+accordingly.
+
+## Follow-up: Guide definition structure established
+
+Resolved the fifth flagged follow-up: the Guide definition's structure was
+established through dialogue and added to the [Guide definition](#guide-definition)
+subsection.
+
+Decisions:
+
+- **Hybrid form.** The Guide definition is a structured object with a free-form
+  voice section (the prose personality) and optional typed fields: greeting
+  (how the Guide may greet on session start) and safety posture (personality-
+  level safety guidance supplementing `safety_consult`).
+- **Separate from annotations.** Annotations are topic-linked notes on specific
+  content, authored in frontmatter, retrieved at runtime (owned by
+  [Annotations](./annotations.spec.md)). The Guide definition is the standing
+  personality, applied to every interaction. The backend composes the prompt
+  from three separately-owned sources: the constrained-agent framing (provider),
+  the Guide definition (this spec), and annotations (annotations spec).
+- **Lives in the content repository.** Versioned with the worldbuilding, read
+  by the backend alongside source Markdown and content-specific config.
+
+The guide package journal's "Prompt construction" gap was updated to reference
+the now-established Guide definition. The annotations spec's
+relationship-to-personality section was updated to distinguish annotations
+from the Guide definition and reference this spec.
+
+## Follow-up: configuration API shape established
+
+Resolved the sixth flagged follow-up: the configuration API's top-level shape
+was established through dialogue and added to the
+[Configuration API](#configuration-api) subsection.
+
+Decisions:
+
+- **Top-level structure.** The configuration object is organised into sections
+  grouping configuration by concern: `content`, `llm`, `stores`, `access`,
+  `guide`, `retrieval`, `runtime`. The policy parameters within each subsystem
+  section are those defined by the owning domain spec's policy-parameter table;
+  this API references them rather than duplicating (avoiding the "central
+  catalog" coupling the policy-and-configuration journal explicitly rejected).
+- **Entry-point construction.** The application author constructs the
+  configuration object at the frontend and backend entry points by resolving
+  the sources (content repo + deployment env) over the default profile. The
+  author provides the sources and overrides; the API and default profile fill
+  in the rest. The frontend excludes backend-only sections and secrets.
+- **Conventions, defaults, validation, provision** were reorganised under the
+  Configuration API subsection, with Gherkin scenarios for entry-point
+  construction, frontend exclusion, and the section structure.
+
+The "specific shape ... to be established" deferral was replaced with the
+section structure; the specific field names/types/defaults within each section
+remain implementation concerns defined by the owning specs' parameter tables.

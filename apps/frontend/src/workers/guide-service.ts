@@ -2,7 +2,7 @@
  * The frontend's Guide agent service: a service-bus implementation that owns a
  * {@link GuideService} (and through it an {@link AgentLoop}) running inside the
  * Guide's dedicated worker, as defined by
- * [Runtime topology](../../specs/usage-and-deployment.spec.md#runtime-topology).
+ * [Runtime](../../specs/runtime.spec.md#worker-topology).
  *
  * The Guide worker builds the loop's non-serialisable dependencies — the
  * {@link HttpLlmProvider}, the {@link ToolRegistry}, and the

@@ -6,9 +6,9 @@
  *
  * Also tracks the last-modified timestamp of each document/block to support
  * the `since`/invalidation-list mechanism, as defined by
- * [Usage and deployment](../../specs/usage-and-deployment.spec.md#client-side-retrieval-and-caching).
+ * [Content-first retrieval](../../specs/content-first-retrieval.spec.md#client-side-caching).
  *
- * @see specs/usage-and-deployment.spec.md#client-side-retrieval-and-caching
+ * @see specs/content-first-retrieval.spec.md#client-side-caching
  */
 
 import {

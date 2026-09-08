@@ -16,6 +16,7 @@ It governs:
 - shared state — slices, mutations, the state authority, local copies, and the state-change propagation protocol;
 - the declaration-driven programming model — service declarations, slice declarations, and typed proxies;
 - message ordering and the initializer protocol;
+- the bootstrap orchestration — the ordered sequence by which the runtime is started, services are registered and initialized, and the frontend becomes ready;
 - the policy parameters owned by this specification.
 
 It is explicitly out of scope for this specification to define:
@@ -25,7 +26,7 @@ It is explicitly out of scope for this specification to define:
 - the content model and retrieval interface — which are defined by [Content model](./content-model.spec.md) and [Content-first retrieval](./content-first-retrieval.spec.md);
 - the three-way interaction model — the roles of the actors, the permitted interface operations, and the conflict-resolution rules — which is defined by [Three-way interaction](./three-way-interaction.spec.md);
 - the `interface` slice's concrete fields — which are established by [UI](./ui.spec.md) as a refinement of this specification;
-- the runtime topology — which subsystems run in which workers — which is defined by [Usage and deployment](./usage-and-deployment.spec.md);
+- the runtime topology — the deployment-level split between frontend and backend, and the external dependencies of a deployed instance — which is defined by [Usage and deployment](./usage-and-deployment.spec.md); the in-frontend worker placement is defined by this specification;
 - the concrete field schemas of the `interface` and `session` slices — which are established by refinement of this specification.
 
 Where this specification depends on behaviour defined by those specifications, it links to them and states its requirement in terms of their observable behaviour.
@@ -928,6 +929,45 @@ interface SliceStore<T extends SliceDeclaration> {
 }
 ```
 
+## Bootstrap
+
+The bootstrap is the ordered sequence by which the frontend application starts the runtime, registers and initializes services, and becomes ready for the Visitor. The application's bootstrap code owns the orchestration; this specification defines the sequence and the runtime's role within it. Steps owned by other specifications are referenced, not restated.
+
+1. **Service Worker activation.** The Service Worker activates and obtains a token, as defined by [UI](./ui.spec.md#service-worker). This precedes runtime startup so that backend requests during bootstrap carry valid credentials.
+2. **Runtime creation.** The runtime is created and started, with the `ServiceBroker` in its dedicated Web Worker, as defined in [Worker topology](#worker-topology). A `RuntimeClient` is available on the main thread.
+3. **Slice registration.** Slices are registered with the store builder, as defined in [Slice registration](#slice-registration). The `interface` slice and other shared slices are registered before the services that depend on them are initialized.
+4. **Service registration.** Services are registered with the broker via the `RuntimeClient`, as defined in [Service registration](#service-registration). The state authority is colocated as a service on the broker's local host.
+5. **Service initialization.** Each service with an `initializer` is initialized by the bootstrap code dispatching the initializer behaviour, as defined in [Initialization](#initialization). Services with `requiredSlices` wait for their slices before initializing. The retrieval service connects to the backend over HTTP and fetches the table of contents, as defined by [Content-first retrieval](./content-first-retrieval.spec.md#client-side-caching). The Guide agent loop service connects to the runtime.
+6. **UI mount.** The UI is mounted on the main thread, as defined by [UI](./ui.spec.md).
+7. **Session start.** The UI emits `session_start` (trigger probability 1.0), which flushes the event queue and triggers the Guide's first interaction, as defined by [UI](./ui.spec.md#session-start). The Guide may greet the Visitor or decline to act (return FINISHED), as permitted by [Constrained agent](./constrained-agent.spec.md#finished).
+8. **Guide operation.** The Guide begins consuming events and responding, as defined by [Constrained agent](./constrained-agent.spec.md).
+
+The ordering is normative where dependencies require it: the broker must be running before services are registered; slices must be registered before services that require them are initialized; services must be initialized before they receive calls; the UI must be mounted before `session_start` is emitted. Where no dependency requires an ordering, steps may proceed concurrently (e.g. service initialization across independent services).
+
+```gherkin
+Feature: Bootstrap
+  Rule: The frontend bootstraps the Service Worker, runtime, slices, services, and UI in a dependency-ordered sequence
+
+  Scenario: Frontend bootstrap
+    Given the frontend page has loaded
+    When the bootstrap runs
+    Then the Service Worker must activate and obtain a token
+    And the runtime must be started with the broker in a worker
+    And slices must be registered before services that require them are initialized
+    And services must be registered with the broker
+    And the state authority must be colocated on the broker's local host
+    And services with initializers must be initialized
+    And the UI must be mounted on the main thread
+    And the UI must emit a session_start event with trigger probability 1.0
+    And the session_start event must flush the queue and trigger the Guide's first interaction
+
+  Scenario: Independent services initialize concurrently
+    Given two services with no dependency between them
+    When their initializers are dispatched
+    Then they may initialize concurrently
+    And neither must wait for the other
+```
+
 ## Relationship to other specifications
 
 The runtime is the execution substrate for several other specifications:
@@ -937,7 +977,7 @@ The runtime is the execution substrate for several other specifications:
 - **Agentic model** — the agentic model (events, queue, flush, interaction triggering, budget), as defined by [Constrained agent](./constrained-agent.spec.md), produces and queues events and triggers interactions. The Guide agent loop runs as a service on the runtime. Agentic event dispatch uses behaviours; interaction requests use behaviours, decoupling the UI from the Guide's processing.
 - **Safety consultation** — the `safety_consult` tool, as defined by [Agent safety](./agent-safety.spec.md), invokes a safety consultant service through the runtime.
 - **Shared state** — the `interface` slice's concrete fields are established by [UI](./ui.spec.md) as a refinement of this specification. The conflict-resolution rules are defined by [Three-way interaction](./three-way-interaction.spec.md) and enforced at tool-call dispatch time, as defined by [UI](./ui.spec.md#ui-control-tools).
-- **Deployment topology** — the worker topology in which the runtime operates is defined by [Usage and deployment](./usage-and-deployment.spec.md).
+- **Deployment topology** — the deployment-level split between frontend and backend, and the external dependencies of a deployed instance, are defined by [Usage and deployment](./usage-and-deployment.spec.md). The in-frontend worker placement is defined by this specification. The bootstrap orchestration is defined in [Bootstrap](#bootstrap).
 
 This specification defines the runtime; the specific services are defined by their respective domain specifications.
 
@@ -979,4 +1019,5 @@ An implementation conforms to this specification when:
 - optimistic concurrency is enforced via a basis sequence number embedded transparently by the store interface; `StaleBasisError` is retried transparently after local copy convergence;
 - local copies fetch initial snapshots on boot, apply propagated changes in sequence, recover from gaps, and expose reads through TC39 signals;
 - the store builder exposes reactive state, typed mutation methods, slice registration, and slice availability discovery; the store interface hides basis sequences, stale-basis retries, and gap recovery from consumers;
-- the state-change propagation mechanism provides fan-out, ordering, and gap recovery; `BroadcastChannel` is the reference implementation.
+- the state-change propagation mechanism provides fan-out, ordering, and gap recovery; `BroadcastChannel` is the reference implementation;
+- the bootstrap orchestration starts the Service Worker, runtime (broker in a worker), slice and service registration, service initialization, UI mount, and `session_start` emission in a dependency-ordered sequence, as defined in [Bootstrap](#bootstrap).

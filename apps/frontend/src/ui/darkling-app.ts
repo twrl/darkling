@@ -3,7 +3,7 @@
  * manager, the event queue, the tools, and the UI components.
  *
  * @see specs/ui.spec.md
- * @see specs/usage-and-deployment.spec.md#bootstrap-sequence
+ * @see specs/runtime.spec.md#bootstrap
  */
 
 import { LitElement, css, html, nothing } from 'lit';

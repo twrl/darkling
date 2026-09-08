@@ -22,15 +22,17 @@ It is explicitly out of scope for this specification to define:
 
 ## Bootstrap sequence
 
-On page load, the frontend bootstraps the runtime, as defined by [Usage and deployment](../../specs/usage-and-deployment.spec.md#bootstrap-sequence):
+On page load, the frontend bootstraps the runtime, as defined by [Runtime](../../specs/runtime.spec.md#bootstrap):
 
-1. The service bus is created and started, with the broker in its Web Worker.
-2. The retrieval service is registered on the bus (running in a worker), connecting to the backend over HTTP.
-3. The Guide agent loop service is registered on the bus (running in a worker).
-4. The state manager authority service is registered on the bus (running in a worker).
-5. The UI-control and avatar-interaction tools are registered on the bus.
-6. The UI is mounted on the main thread, producing events as the Visitor interacts.
-7. The UI emits `session_start` (trigger probability 1.0), flushing the event queue and triggering the Guide's first interaction, as defined by [User interface](../../specs/ui.spec.md#session-start).
+1. The Service Worker activates and obtains a token, as defined by [User interface](../../specs/ui.spec.md#service-worker).
+2. The runtime is created and started, with the broker in its Web Worker.
+3. Slices are registered (including the `interface` slice).
+4. The retrieval service is registered on the runtime (running in a worker), connecting to the backend over HTTP.
+5. The Guide agent loop service is registered on the runtime (running in a worker).
+6. The state authority service is colocated on the broker's local host.
+7. The UI-control and avatar-interaction tools are registered on the runtime.
+8. The UI is mounted on the main thread, producing events as the Visitor interacts.
+9. The UI emits `session_start` (trigger probability 1.0), flushing the event queue and triggering the Guide's first interaction, as defined by [User interface](../../specs/ui.spec.md#session-start).
 
 ## Structural contract
 

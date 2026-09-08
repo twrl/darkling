@@ -3,7 +3,7 @@
  * retrieval operations, plus a ToC endpoint, with `since`/invalidation-list
  * wrapping.
  *
- * @see specs/usage-and-deployment.spec.md#client-side-retrieval-and-caching
+ * @see specs/content-first-retrieval.spec.md#client-side-caching
  * @see specs/content-first-retrieval.spec.md
  */
 

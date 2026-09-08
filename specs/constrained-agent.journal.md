@@ -174,3 +174,9 @@ Several gaps recorded in this journal are resolved by the consolidation:
 ### Spec consistency
 
 All specifications that formerly linked to `event-system.spec.md` have been updated to link to the corresponding sections of `constrained-agent.spec.md`. The event-system spec is retained as a redirect with a section-mapping table for any external references. The policy-and-configuration spec's references to "Event system" as the owner of budget and flush policy parameters are updated to reference the constrained agent spec. No normative requirements have been changed by the consolidation; the content is reorganised, not altered, except for the removal of the now-redundant cross-references and deferral disclaimers.
+
+## Cross-visit persistence mechanism moved here from Usage and deployment
+
+After the usage-and-deployment spec was refocused on assembly and deployment, the per-tier session state persistence *mechanism* was moved into this specification's Persistence and scope section. The link reversed: previously this spec referenced usage-and-deployment for the implementation policy ("does not survive a reset ... beyond what implementation policy defines"); now usage-and-deployment states the deployment-level policy (per-tier configurable persistence) and references this spec for the mechanism.
+
+This section now owns: the working memory value as the unit of persistence; persistent tiers restoring the prior value on return visits, ephemeral tiers discarding it; per-browser scope; clearing site data resets regardless of tier; and the budget carryover following the same per-tier policy with its carryover shape (`min(spent, remaining)`) owned here. New Gherkin scenarios for persistent/ephemeral restoration were added. The deployment-level policy (tier determined by token claims, persistence as a tier property) remains in usage-and-deployment.

@@ -122,7 +122,7 @@ export interface HttpLlmProviderOptions {
    * A fetch implementation. Defaults to the global `fetch`. The host may
    * inject a custom fetch (e.g. for testing, or to route through the Service
    * Worker that attaches the bearer token, as defined by
-   * [Service Worker token handling](../../specs/usage-and-deployment.spec.md#service-worker-token-handling)).
+   * [Service Worker](../../specs/ui.spec.md#service-worker)).
    */
   fetch?: typeof fetch;
 }

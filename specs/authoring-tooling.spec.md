@@ -104,7 +104,7 @@ Content sources may live in an external git repository, separate from the applic
 - The compilation process must be able to compile source material from an external repository.
 - The specific mechanism by which the source repository is cloned, fetched, or synced is an implementation detail.
 
-In the deployment defined by [Usage and deployment](./usage-and-deployment.spec.md#content-lifecycle), the backend is the component that accesses the external git repository, compiles the source on webhook, and writes the compiled model to a persistent store. A content-specific configuration file may live in the root of the content repository alongside the source Markdown, as defined in [Usage and deployment](./usage-and-deployment.spec.md#configuration); this specification governs the source format, not the configuration file format.
+In the deployment defined by [Usage and deployment](./usage-and-deployment.spec.md#content-sources-and-publishing-workflows), the backend is the component that accesses the external git repository, compiles the source on webhook, and writes the compiled model to a persistent store. A content-specific configuration file may live in the root of the content repository alongside the source Markdown, as defined in [Usage and deployment](./usage-and-deployment.spec.md#application-configuration-api); this specification governs the source format, not the configuration file format.
 
 ### Recompilation trigger
 

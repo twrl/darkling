@@ -62,7 +62,7 @@ const DEFAULT_MAX_TURNS = 20;
  * {@link BudgetTracker}; runs one interaction at a time when triggered.
  *
  * The loop is the component that runs in the Guide's dedicated Web Worker, as
- * defined by [Runtime topology](../../specs/usage-and-deployment.spec.md#runtime-topology).
+ * defined by [Runtime](../../specs/runtime.spec.md#worker-topology).
  * It is worker-safe: it uses no Node.js or DOM APIs and depends only on the
  * injected {@link LlmProvider}, {@link ToolRegistry}, and {@link BudgetTracker}.
  */

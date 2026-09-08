@@ -236,7 +236,7 @@ Feature: Pagination and limits
 
 The retrieval interface is backed by storage and indexing mechanisms. This specification defines the required indexes; the specific storage technology is an implementation concern.
 
-In the deployment defined by [Usage and deployment](./usage-and-deployment.spec.md#client-side-retrieval-and-caching), the retrieval service runs on the frontend's runtime, with its store and index providers backed by HTTP calls to the backend, which queries a persistent store. The block store is the backend's persistent store; the frontend maintains a cache. This specification is deployment-agnostic: it defines the retrieval interface and required indexes, not where they execute.
+In the deployment defined by [Usage and deployment](./usage-and-deployment.spec.md#runtime-topology-and-external-dependencies), the retrieval service runs on the frontend's runtime, with its store and index providers backed by HTTP calls to the backend, which queries a persistent store. The block store is the backend's persistent store; the frontend maintains a client-side cache, as defined in [Client-side caching](#client-side-caching). This specification is deployment-agnostic in its retrieval interface and required indexes; the client-side caching behaviour and the cache invalidation interface are defined here.
 
 ### Block store
 
@@ -292,6 +292,80 @@ Feature: Storage and indexing
     Then the relationship index must return A with type "references"
 ```
 
+## Client-side caching
+
+In the deployment defined by [Usage and deployment](./usage-and-deployment.spec.md#runtime-topology-and-external-dependencies), the retrieval service runs on the frontend's runtime, backed by HTTP-client store and index providers that call the backend over HTTP. The frontend maintains a client-side cache with prefetch, keeping cache I/O off the main thread. This section defines the caching behaviour and the cache invalidation interface.
+
+### Cache
+
+The frontend caches retrieved documents and content blocks in a client-side store (e.g. IndexedDB). The cache is a client-side optimisation; the backend's persistent store is the source of truth.
+
+- A cached entry may be served for a repeated retrieval without calling the backend.
+- The cache does not alter the retrieval interface's result shapes; a cache hit must return the same result as a backend retrieval.
+
+### Prefetch
+
+The frontend may prefetch likely-needed content to reduce latency for subsequent retrieval calls. Prefetch is an optimisation; it must not change the observable retrieval behaviour.
+
+- Examples: a document's block tree when the document is opened, or the targets of a block's relationships when the block is retrieved.
+
+### Cache invalidation
+
+The cache is a cache, not a local copy: the backend's persistent store is the source of truth, and cached entries may become stale when the compiled model is recompiled. Cache invalidation is piggybacked on retrieval calls.
+
+- When making a retrieval call, the frontend may include a `since` parameter: a last-access timestamp (the time of its last successful synchronisation).
+- The backend responds with the requested data and, in addition, an **invalidation list**: a list of IDs of documents and content blocks whose cached entries are no longer valid — those that have been added, modified, or removed since the `since` timestamp.
+- The backend must not send the changed content itself; it sends only the list of invalid IDs.
+- The frontend invalidates the listed cache entries and updates its last-access timestamp.
+- It is up to the client to decide whether and when to reload the invalidated content (e.g. on next access, or eagerly).
+- This piggybacks invalidation on every retrieval call, so the client stays current without a separate invalidation polling endpoint.
+
+### Table of contents
+
+On bootstrap, the frontend fetches a lightweight **table of contents** from the backend and caches it. The ToC is the document-level index: document IDs, slugs, and titles (no block content).
+
+- The ToC lets the UI render navigation, the Guide to know what documents exist without a full retrieval, and prefetch to be directed.
+- The ToC is small and high-value; it is invalidated via the same invalidation list as the rest of the cache.
+
+### Offline
+
+The cache is not an offline-first store. Darkling requires a network connection to the backend for LLM calls and for cache misses. The cache reduces latency, not network dependency.
+
+### Bundled fallback
+
+The in-memory store and index implementations provided by `@darkling/knowledge-base` are used for testing and as a bundled fallback. In production, the frontend's retrieval service uses HTTP-client backends that call the backend, backed by the client-side cache.
+
+```gherkin
+Feature: Client-side caching
+  Rule: Retrieval from the backend; results cached and prefetched client-side; invalidation piggybacked on retrieval
+
+  Scenario: Cache invalidation piggybacks on retrieval
+    Given the frontend has a last-access timestamp T
+    When the frontend makes a retrieval call including T as the since parameter
+    Then the backend must return the requested data
+    And the backend must return an invalidation list of IDs whose cache entries are no longer valid
+    And the backend must not return the changed content itself
+    And the frontend must invalidate the listed cache entries
+    And the frontend must decide whether and when to reload the invalidated content
+
+  Scenario: Cache serves repeated retrieval
+    Given a block has been retrieved and cached
+    When the same block is requested again
+    Then the frontend may serve it from the cache
+    And the backend is the source of truth
+
+  Scenario: Prefetch reduces latency
+    Given a document has been opened
+    When its root block is retrieved
+    Then the frontend may prefetch the document's block tree
+
+  Scenario: ToC fetched at bootstrap and invalidated
+    Given the frontend has bootstrapped
+    Then the frontend must have fetched and cached the table of contents
+    When the backend returns an invalidation list that includes the ToC's ID
+    Then the frontend must invalidate the cached ToC
+```
+
 ## Policy parameters
 
 The retrieval model is governed by a set of policy parameters. This specification defines the parameters that must exist and their required properties; the specific values are implementation-defined and may be configurable.
@@ -320,4 +394,5 @@ An implementation conforms to this specification when:
 - paginated retrieval modes support limit, cursor, and has-more;
 - the block store, property index, text index, relationship index, and containment index are maintained and support the required lookups;
 - the block store is read-only with respect to the Guide;
+- the frontend caches and prefetches retrieval results in a client-side cache, fetches a table of contents at bootstrap, and invalidates stale cache entries via an invalidation list returned alongside retrieval results when a `since` parameter is provided (the client decides whether and when to reload);
 - all policy parameters have defined values.

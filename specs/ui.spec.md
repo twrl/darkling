@@ -11,6 +11,7 @@ It governs:
 - the Guide's avatar presentation — the Guide's visible figure and speech, and its placement within the scene;
 - attention — how the Guide's Draw-attention operation is rendered transiently on a content block;
 - the high-level semantic event vocabulary — the controlled set of event types the UI produces and their payloads, owed to [Constrained agent](./constrained-agent.spec.md#events);
+- the Service Worker — the browser Service Worker that manages token handling transparently for backend requests, as defined in [Service Worker](#service-worker);
 - the interface operations exposed to both the Visitor and the Guide — Navigate and Draw attention, as defined by [Three-way interaction](./three-way-interaction.spec.md#interface-control), and the UI-control tools that back the Guide's invocation of them;
 - the `interface` state slice — its concrete fields, as a refinement of [Runtime](./runtime.spec.md#slice-declarations); the conflict-resolution rules are defined by [Three-way interaction](./three-way-interaction.spec.md#conflict-resolution) and enforced at tool-call dispatch time, as defined in [UI-control tools](#ui-control-tools);
 - cap-enforcement presentation — the in-world "rest" surface, as required by [Usage and deployment](./usage-and-deployment.spec.md#cap-enforcement).
@@ -23,7 +24,7 @@ It is explicitly out of scope for this specification to define:
 - the content model — documents, content blocks, relationships, and the compiled content format — which are defined by [Content model](./content-model.spec.md) and [Authoring tooling](./authoring-tooling.spec.md);
 - the retrieval interface — which is defined by [Content-first retrieval](./content-first-retrieval.spec.md);
 - annotations — which are private to the Guide and must not be rendered by the UI, as defined by [Annotations](./annotations.spec.md);
-- the runtime topology — which subsystems run in which workers, the Service Worker, and token handling — which are defined by [Usage and deployment](./usage-and-deployment.spec.md);
+- the runtime topology — the deployment-level split between frontend and backend, and the external dependencies of a deployed instance — which is defined by [Usage and deployment](./usage-and-deployment.spec.md); the in-frontend worker placement is defined by [Runtime](./runtime.spec.md);
 - the runtime's state mechanism — the authority, local copies, state-change propagation, and reactivity — which is defined by [Runtime](./runtime.spec.md). This specification refines the `interface` slice's fields within that mechanism;
 - the specific persistent store, LLM provider, and deployment platform — which are defined by [Usage and deployment](./usage-and-deployment.spec.md).
 
@@ -31,7 +32,7 @@ Where this specification depends on behaviour defined by those specifications, i
 
 ## Design context
 
-Darkling is an immersive, single-Visitor experience: a person explores an interconnected body of fictional material (the Archive) in the company of the Guide. The UI is the surface through which the Visitor reads the Archive, through which the Guide acts upon the Archive interface, and through which the Guide addresses the Visitor. The UI runs on the main thread as Lit components, producing high-level semantic events consumed by the Guide, as defined by [Usage and deployment](./usage-and-deployment.spec.md#main-thread).
+Darkling is an immersive, single-Visitor experience: a person explores an interconnected body of fictional material (the Archive) in the company of the Guide. The UI is the surface through which the Visitor reads the Archive, through which the Guide acts upon the Archive interface, and through which the Guide addresses the Visitor. The UI runs on the main thread as Lit components, producing high-level semantic events consumed by the Guide, as defined by [Runtime](./runtime.spec.md#worker-topology).
 
 The UI's central design decision is a spatial metaphor: the Archive is presented as a stack of glassy tablets projected above a surface, and the Guide inhabits the same scene as a visible figure that addresses the Visitor and gestures toward the material. This metaphor serves the three-way interaction model defined by [Three-way interaction](./three-way-interaction.spec.md): the Archive is the shared substrate the Visitor and the Guide both act upon, the Guide draws attention to material by acting on the interface, and the Visitor is the principal agent whose actions take precedence.
 
@@ -62,7 +63,7 @@ An **overlay plane** is a fixed plane above the topmost tablet, hosting the Guid
 
 ### Rendering technology
 
-The scene is rendered on the main thread, as defined by [Usage and deployment](./usage-and-deployment.spec.md#main-thread). Animation of the avatar and tablet transitions may use `OffscreenCanvas` in a worker, with frames transferred to the main thread via the runtime's Transferable object support, as defined by [Runtime](./runtime.spec.md#transferable-objects); general UI logic remains on the main thread. The specific rendering library is an implementation concern, provided the scene is presented as the spatial model defined here and UI logic runs on the main thread.
+The scene is rendered on the main thread, as defined by [Runtime](./runtime.spec.md#worker-topology). Animation of the avatar and tablet transitions may use `OffscreenCanvas` in a worker, with frames transferred to the main thread via the runtime's Transferable object support, as defined by [Runtime](./runtime.spec.md#transferable-objects); general UI logic remains on the main thread. The specific rendering library is an implementation concern, provided the scene is presented as the spatial model defined here and UI logic runs on the main thread.
 
 ```gherkin
 Feature: Scene
@@ -80,7 +81,7 @@ Feature: Scene
 
 The scene contains tablets that do not present document content: a **table-of-contents tablet** and a **search tablet**. These are navigation surfaces, presented as tablets in the same spatial model as document tablets, and may be minimised to icons on a dedicated icon rail (UI chrome).
 
-- **ToC tablet.** Presents the table of contents (the document-level index: document IDs, slugs, and titles, fetched on bootstrap, as defined by [Usage and deployment](./usage-and-deployment.spec.md#client-side-retrieval-and-caching)). The Visitor selects a document from the ToC tablet to open it: if the document is already in the stack, it is brought to the front; otherwise a new document tablet is pushed onto the front of the stack.
+- **ToC tablet.** Presents the table of contents (the document-level index: document IDs, slugs, and titles, fetched on bootstrap, as defined by [Content-first retrieval](./content-first-retrieval.spec.md#client-side-caching)). The Visitor selects a document from the ToC tablet to open it: if the document is already in the stack, it is brought to the front; otherwise a new document tablet is pushed onto the front of the stack.
 - **Search tablet.** Presents a search interface over the Archive (textual search, as defined by [Content-first retrieval](./content-first-retrieval.spec.md#retrieval-by-textual-content)). The Visitor enters a query and selects a result to open the target document/block: if the target document is already in the stack, it is brought to the front and the target block is focused; otherwise a new tablet is pushed and the target block is focused.
 - **Minimising.** Either non-document tablet may be minimised to an icon on the icon rail, which lives on the overlay plane above the topmost tablet, as defined in [Overlay plane](#overlay-plane). Clicking/tapping a minimised icon restores the tablet. Minimising and restoring are UI affordances on the non-document tablets, not state changes to the `interface` slice (the `interface` slice tracks document tablets, not the ToC/search tablet or their minimised state).
 - **Relationship to document tablets.** Non-document tablets are not part of the document stack and are not subject to the front-most-active/behind-recede ordering of document tablets. They are independent surfaces the Visitor opens, minimises, and restores as navigation aids. Whether a non-document tablet visually occludes or sits alongside the document stack when open is an implementation concern; the spec requires that the ToC and search are presented as tablets (not as always-visible chrome) and may be minimised to icons on the icon rail.
@@ -121,7 +122,7 @@ A block within the active document's tablet may be **focused**.
 
 The Visitor navigates the Archive by opening, bringing forward, and closing documents, and by traversing relationships.
 
-- **Table of contents.** The ToC tablet lists the documents of the Archive by title, as fetched on bootstrap, as defined in [Non-document tablets](#non-document-tablets) and [Usage and deployment](./usage-and-deployment.spec.md#client-side-retrieval-and-caching). The Visitor selects a document from the ToC tablet to open it: if the document is already in the stack, it is brought to the front; otherwise a new tablet is pushed onto the front of the stack.
+- **Table of contents.** The ToC tablet lists the documents of the Archive by title, as fetched on bootstrap, as defined in [Non-document tablets](#non-document-tablets) and [Content-first retrieval](./content-first-retrieval.spec.md#client-side-caching). The Visitor selects a document from the ToC tablet to open it: if the document is already in the stack, it is brought to the front; otherwise a new tablet is pushed onto the front of the stack.
 - **In-content relationship links.** Relationships between content blocks are rendered as navigable links within the document's content, as defined by [Content model](./content-model.spec.md#relationships). The Visitor follows a relationship link to open the target: if the target document is already in the stack, it is brought to the front and the target block is focused; otherwise a new tablet is pushed and the target block is focused.
 - **Closing a tablet.** The Visitor may close a tablet, removing its document from the stack. Closing the active tablet makes the next tablet behind it the active document. Closing the last tablet leaves the stack empty; the scene presents the ground plane and the Guide with no active document.
 - **Scroll within a document.** The Visitor may scroll within the active tablet's continuous render. Scrolling changes the blocks in view but does not change the active document or push a tablet.
@@ -385,6 +386,52 @@ Feature: Events
     Because the Visitor arriving at the Archive is Visitor activity
 ```
 
+## Service Worker
+
+A Service Worker runs in the browser, intercepting fetch requests from the frontend. Its responsibility is transparent token handling: it attaches `Authorization: Bearer <token>` headers to requests destined for the backend (LLM proxy and retrieval) and manages the token lifecycle, so that the frontend's application code is unaware of tokens.
+
+### Token lifecycle
+
+The Service Worker manages the token lifecycle, as defined by the access model in [Usage and deployment](./usage-and-deployment.spec.md#access-and-authentication):
+
+- **Activation.** On activation, the Service Worker obtains a token: it exchanges a presented pre-shared secret for a signed token, or requests an anonymous token if no secret is presented. The token carries the Visitor's access-tier claim.
+- **Attachment.** The Service Worker intercepts fetch requests destined for the backend and attaches `Authorization: Bearer <token>` before forwarding them. Requests to other origins are passed through unmodified.
+- **Refresh and expiry.** The Service Worker handles token refresh and expiry, re-exchanging or refreshing as needed, so that backend requests continue to carry a valid token without application-code involvement.
+- **Token isolation.** The token is not visible to the page and is not carried in a cookie. Application code makes ordinary `fetch` calls; the Service Worker intercepts, attaches, and manages the token transparently.
+
+The application code is unaware of tokens and unaware of the tier, except that the UI displays in-world messaging when a cap is reached, as defined in [Cap enforcement](#cap-enforcement). The backend validates the token on each request and applies the tier's caps and limits, as defined by [Usage and deployment](./usage-and-deployment.spec.md#cost-and-abuse-controls).
+
+### Bootstrap ordering
+
+The Service Worker activates and obtains a token before the runtime starts, so that backend requests during bootstrap (e.g. the table-of-contents fetch) carry valid credentials. This is the first step of the bootstrap sequence, as defined by [Runtime](./runtime.spec.md#bootstrap).
+
+```gherkin
+Feature: Service Worker
+  Rule: The Service Worker manages tokens transparently; application code is unaware of tokens
+
+  Scenario: Service Worker attaches the token transparently
+    Given the Service Worker holds a valid token
+    When the frontend makes a fetch request to the backend
+    Then the Service Worker must attach the Authorization header
+    And the application code must not handle the token
+
+  Scenario: Service Worker obtains a token on activation
+    Given the frontend page has loaded
+    When the Service Worker activates
+    Then it must obtain a token (exchanging a presented secret or requesting an anonymous token)
+    And this must occur before backend requests are made during bootstrap
+
+  Scenario: Token is not visible to the page
+    Given the Service Worker holds a token
+    Then the token must not be visible to the page
+    And the token must not be carried in a cookie
+
+  Scenario: Non-backend requests pass through
+    Given the frontend makes a fetch request to an origin other than the backend
+    When the Service Worker intercepts it
+    Then it must pass the request through unmodified
+```
+
 ## Addressing the Guide
 
 The Visitor may directly address the Guide. A direct address is the mechanism by which the Visitor asks the Guide a question or responds to the Guide.
@@ -592,5 +639,6 @@ An implementation of the UI conforms to this specification when:
 - it registers the `navigate` and `draw_attention` UI-control tools and the `speak`, `set_avatar_position`, `set_avatar_visibility`, and `animate_avatar` avatar-interaction tools on the bus with the defined parameters and effects, as defined in [UI-control tools](#ui-control-tools) and [Avatar-interaction tools](#avatar-interaction-tools);
 - it declares the `interface` slice with the fields defined in [The `interface` slice](#the-interface-slice) (including per-tablet `openedBy`), and enforces User precedence at `navigate` tool-call dispatch time, as defined in [UI-control tools](#ui-control-tools);
 - it presents the spend cap as an in-world rest message through the Guide's avatar speech, as defined in [Cap enforcement](#cap-enforcement);
-- it runs on the main thread, with animation optionally via `OffscreenCanvas` in a worker, as defined in [Rendering technology](#rendering-technology) and [Usage and deployment](./usage-and-deployment.spec.md#main-thread);
+- it runs on the main thread, with animation optionally via `OffscreenCanvas` in a worker, as defined in [Rendering technology](#rendering-technology) and [Runtime](./runtime.spec.md#worker-topology);
+- a Service Worker manages the token lifecycle transparently, attaching `Authorization: Bearer` headers to backend requests, with the token not visible to the page and application code unaware of tokens, as defined in [Service Worker](#service-worker);
 - it consumes the `interface` slice reactively via a `LocalCopy` and TC39 signals, proposing updates through the bus, as defined in [Reactivity and shared state](#reactivity-and-shared-state).

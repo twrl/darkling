@@ -299,11 +299,23 @@ Working memory persists across interactions. Unlike the budget (which is per-int
 
 - Working memory is scoped to the Guide. It is not shared with the User or the Archive.
 - Working memory is not visible to the User. It is part of the Guide's internal state.
-- Working memory is not part of the Archive's record. It does not survive a reset of the Guide's state beyond what implementation policy defines. The implementation policy for working memory persistence is established by [Usage and deployment](./usage-and-deployment.spec.md#session-state-persistence): persistence is configurable per access tier, with persistent tiers storing state in IndexedDB across visits and ephemeral tiers discarding it at visit end.
+- Working memory is not part of the Archive's record.
+
+#### Cross-visit persistence
+
+Whether working memory survives a reset of the Guide's state (e.g. a page reload or the end of a browser visit) is governed by the session model's per-tier persistence policy, established by [Usage and deployment](./usage-and-deployment.spec.md#session-model): a tier whose persistence policy is **persistent** retains working memory across visits for the same browser; a tier whose policy is **ephemeral** discards it at visit end.
+
+This specification owns the mechanism by which working memory persistence is realised:
+
+- The working memory value is the unit of persistence. When the Guide's state is reset at the end of a visit, the current working memory value is the candidate for retention; on the next visit, a persistent tier restores that value as the Guide's initial working memory, and an ephemeral tier starts with no working memory (or an implementation-defined initial value).
+- Persistence is per-browser, not per-account: there are no accounts, so the browser is the scope of persistence. Clearing site data resets persisted working memory regardless of tier.
+- The specific storage location (e.g. IndexedDB) and the carryover shape are implementation concerns; this specification requires that a persistent tier restores the prior working memory value on a return visit and that an ephemeral tier does not.
+
+The budget carryover, if persisted, follows the same per-tier policy; its carryover shape (`min(spent, remaining)`, as defined in [Budget](#budget)) is owned by this specification.
 
 ```gherkin
 Feature: Working memory
-  Rule: Working memory persists across interactions and is replaced wholesale
+  Rule: Working memory persists across interactions and is replaced wholesale; cross-visit persistence is per-tier
 
   Scenario: Working memory persists to the next interaction
     Given the Guide issues update_working_memory with value {"topic": "ceph-biology"}
@@ -315,6 +327,16 @@ Feature: Working memory
     When the Guide issues update_working_memory with value {"topic": "cephalopods"}
     Then the working memory must be {"topic": "cephalopods"}
     And the "depth" key must not be present
+
+  Scenario: Persistent tier restores working memory on return visit
+    Given a Visitor in a persistent tier has working memory W at the end of a visit
+    When the Visitor returns in the same browser
+    Then the Guide's initial working memory must be W
+
+  Scenario: Ephemeral tier discards working memory at visit end
+    Given a Visitor in an ephemeral tier has working memory W at the end of a visit
+    When the Visitor returns in the same browser
+    Then the Guide must start without W
 ```
 
 ## Reasoning
@@ -531,7 +553,7 @@ A tool call may fail to dispatch — for example, because its target could not b
 
 ## Policy parameters
 
-The agentic model is governed by a set of policy parameters. This specification defines the parameters that must exist and their required properties; the specific values are implementation-defined and may be configurable. The cross-cutting contract that all policy parameters follow — that they must have defined values, are resolved statically, and are fixed for the session — is established by [Policy and configuration](./policy-and-configuration.spec.md).
+The agentic model is governed by a set of policy parameters. This specification defines the parameters that must exist and their required properties; the specific values are implementation-defined and may be configurable. The cross-cutting structural contract that all policy parameters satisfy — that they must exist, have defined values, and conform to their type — is established by [Policy and configuration](./policy-and-configuration.spec.md). The delivery mechanism by which values are read, resolved, and provided to subsystems is established by [Usage and deployment](./usage-and-deployment.spec.md#application-configuration-api).
 
 The following policy parameters must be defined:
 

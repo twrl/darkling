@@ -39,7 +39,7 @@ The package does not restate the normative requirements of those specifications.
 
 ## Design context
 
-The Guide operates as an agent driven by events from the UI, as defined by [Agentic model](../../specs/constrained-agent.spec.md#agentic-model). This package implements the loop that runs in the Guide's dedicated Web Worker, as defined by [Runtime topology](../../specs/usage-and-deployment.spec.md#runtime-topology). The loop is worker-safe: it uses no Node.js or DOM APIs and depends only on the injected `LlmProvider`, `ToolRegistry`, and `BudgetTracker`.
+The Guide operates as an agent driven by events from the UI, as defined by [Agentic model](../../specs/constrained-agent.spec.md#agentic-model). This package implements the loop that runs in the Guide's dedicated Web Worker, as defined by [Runtime](../../specs/runtime.spec.md#worker-topology). The loop is worker-safe: it uses no Node.js or DOM APIs and depends only on the injected `LlmProvider`, `ToolRegistry`, and `BudgetTracker`.
 
 The package is the execution substrate for the constrained-agent discipline. It does not own the event queue or the trigger (the agentic model does, as defined by [Constrained agent](../../specs/constrained-agent.spec.md#flush-policy)); it consumes a flushed event queue when triggered and runs one interaction, returning the outcome. The host (the frontend) is responsible for queueing events, rolling for flush, and calling `runInteraction` when a flush occurs.
 
